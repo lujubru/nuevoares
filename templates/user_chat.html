@@ -4,19 +4,19 @@
 <div class="flex flex-col flex-1 h-[calc(100vh-8rem)] sm:h-[calc(100vh-4rem)]">
     <!-- Encabezado -->
     <div class="bg-gray-900 text-white p-3 sm:p-4 flex items-center shadow-lg">
-        <h2 class="text-base sm:text-lg font-semibold">Chat con {{ user[0] }} {{ user[1] }}</h2>
+        <h2 class="text-base sm:text-lg font-semibold">Chat de Ayuda</h2>
     </div>
     <!-- Contenedor de mensajes -->
     <div id="chat-container" class="flex-1 p-3 sm:p-4 overflow-y-auto flex flex-col space-y-2 bg-gray-800">
         {% for message in messages %}
-            <div class="flex mb-2 {% if message[2] == user[0] and message[3] == user[1] %}justify-end{% else %}justify-start{% endif %}">
-                <div class="max-w-[70%] sm:max-w-xs p-2 sm:p-3 rounded-lg shadow-md relative {% if message[2] == user[0] and message[3] == user[1] %}bg-yellow-600 text-black{% else %}bg-blue-900 text-white{% endif %}">
+            <div class="flex mb-2 {% if message[5] == False %}justify-end{% else %}justify-start{% endif %}">
+                <div class="max-w-[70%] sm:max-w-xs p-2 sm:p-3 rounded-lg shadow-md relative {% if message[5] == False %}bg-yellow-600 text-black{% else %}bg-blue-900 text-white{% endif %}">
                     <p class="text-xs sm:text-sm">{{ message[0] }}</p>
                     {% if message[4] %}
                         <a href="{{ url_for('static', filename=message[4] | replace('static/', '')) }}" target="_blank" class="text-red-400 text-xs underline">Ver archivo</a>
                     {% endif %}
                     <p class="text-xs text-gray-300 mt-1">{{ message[1].strftime('%H:%M') }}</p>
-                    <div class="absolute bottom-0 {% if message[2] == user[0] and message[3] == user[1] %}right-[-6px] sm:right-[-8px] border-l-6 sm:border-l-8 border-l-yellow-600{% else %}left-[-6px] sm:left-[-8px] border-r-6 sm:border-r-8 border-r-blue-900{% endif %} border-b-6 sm:border-b-8 border-b-transparent w-0 h-0"></div>
+                    <div class="absolute bottom-0 {% if message[5] == False %}right-[-6px] sm:right-[-8px] border-l-6 sm:border-l-8 border-l-yellow-600{% else %}left-[-6px] sm:left-[-8px] border-r-6 sm:border-r-8 border-r-blue-900{% endif %} border-b-6 sm:border-b-8 border-b-transparent w-0 h-0"></div>
                 </div>
             </div>
         {% endfor %}
@@ -57,19 +57,18 @@
     });
 
     socket.on('new_message', function(data) {
+        console.log('New message received:', data);
         const messageDiv = document.createElement('div');
-        messageDiv.className = 'flex mb-2 ' + (data.name === '{{ user[0] }}' && data.surname === '{{ user[1] }}' ? 'justify-end' : 'justify-start');
+        messageDiv.className = 'flex mb-2 ' + (data.is_user ? 'justify-end' : 'justify-start');
         messageDiv.innerHTML = `
-            <div class="max-w-[70%] sm:max-w-xs p-2 sm:p-3 rounded-lg shadow-md relative ${data.name === '{{ user[0] }}' && data.surname === '{{ user[1] }}' ? 'bg-yellow-600 text-black' : 'bg-blue-900 text-white'}">
+            <div class="max-w-[70%] sm:max-w-xs p-2 sm:p-3 rounded-lg shadow-md relative ${data.is_user ? 'bg-yellow-600 text-black' : 'bg-blue-900 text-white'}">
                 <p class="text-xs sm:text-sm">${data.content}</p>
                 ${data.file_path ? `<a href="/static/${data.file_path.replace('static/', '')}" target="_blank" class="text-red-400 text-xs underline">Ver archivo</a>` : ''}
                 <p class="text-xs text-gray-300 mt-1">${data.timestamp.split(' ')[1].slice(0, 5)}</p>
-                <div class="absolute bottom-0 ${data.name === '{{ user[0] }}' && data.surname === '{{ user[1] }}' ? 'right-[-6px] sm:right-[-8px] border-l-6 sm:border-l-8 border-l-yellow-600' : 'left-[-6px] sm:left-[-8px] border-r-6 sm:border-r-8 border-r-blue-900'} border-b-6 sm:border-b-8 border-b-transparent w-0 h-0"></div>
+                <div class="absolute bottom-0 ${data.is_user ? 'right-[-6px] sm:right-[-8px] border-l-6 sm:border-l-8 border-l-yellow-600' : 'left-[-6px] sm:left-[-8px] border-r-6 sm:border-r-8 border-r-blue-900'} border-b-6 sm:border-b-8 border-b-transparent w-0 h-0"></div>
             </div>
         `;
         chatContainer.appendChild(messageDiv);
-
-        // Hacer scroll hacia abajo después de agregar el mensaje
         setTimeout(scrollToBottom, 50);
     });
 
@@ -79,6 +78,10 @@
         const fileInput = document.getElementById('file');
         const message = messageInput.value;
         if (!message && !fileInput.files[0]) return;
+
+        // Limpiar los campos inmediatamente después del envío
+        messageInput.value = '';
+        fileInput.value = '';
 
         const formData = new FormData();
         formData.append('chat_id', {{ session['chat_id'] }});
@@ -91,13 +94,20 @@
         fetch('/send_message', {
             method: 'POST',
             body: formData
-        }).then(() => {
-            messageInput.value = '';
-            fileInput.value = '';
-
-            // Hacer scroll hacia abajo después de enviar
-            setTimeout(scrollToBottom, 100);
-        });
+        }).then(response => response.json())
+          .then(data => {
+              if (data.status === 'success') {
+                  console.log('Message sent successfully');
+              } else {
+                  console.error('Error sending message:', data);
+                  // Restaurar el mensaje si falla (opcional)
+                  messageInput.value = message;
+              }
+          }).catch(error => {
+              console.error('Fetch error:', error);
+              // Restaurar el mensaje si falla (opcional)
+              messageInput.value = message;
+          });
     });
 </script>
 {% endblock %}

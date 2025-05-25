@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
@@ -6,6 +6,7 @@ import os
 import psycopg2
 from dotenv import load_dotenv
 import uuid
+from datetime import datetime
 
 app = Flask(__name__)
 load_dotenv()
@@ -170,13 +171,15 @@ def user_chat():
         return redirect(url_for('index'))
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("SELECT name FROM users WHERE id = %s", (session['user_id'],))
+    cur.execute("SELECT name, surname FROM users WHERE id = %s", (session['user_id'],))
     user = cur.fetchone()
     cur.execute(
-        "SELECT m.content, m.timestamp, u.name, u.surname, a.file_path "
-        "FROM messages m JOIN users u ON m.sender_id = u.id "
-        "LEFT JOIN attachments a ON m.id = a.message_id "
-        "WHERE m.chat_id = %s ORDER BY m.timestamp",
+        """
+        SELECT m.content, m.timestamp, u.name, u.surname, a.file_path, m.is_admin
+        FROM messages m JOIN users u ON m.sender_id = u.id 
+        LEFT JOIN attachments a ON m.id = a.message_id 
+        WHERE m.chat_id = %s ORDER BY m.timestamp
+        """,
         (session['chat_id'],)
     )
     messages = cur.fetchall()
@@ -210,10 +213,12 @@ def admin_chat(chat_id):
     cur.execute("UPDATE chats SET unread = FALSE WHERE id = %s", (chat_id,))
     conn.commit()
     cur.execute(
-        "SELECT m.content, m.timestamp, u.name, u.surname, a.file_path, u.is_admin "
-        "FROM messages m JOIN users u ON m.sender_id = u.id "
-        "LEFT JOIN attachments a ON m.id = a.message_id "
-        "WHERE m.chat_id = %s ORDER BY m.timestamp",
+        """
+        SELECT m.content, m.timestamp, u.name, u.surname, a.file_path, m.is_admin
+        FROM messages m JOIN users u ON m.sender_id = u.id 
+        LEFT JOIN attachments a ON m.id = a.message_id 
+        WHERE m.chat_id = %s ORDER BY m.timestamp
+        """,
         (chat_id,)
     )
     messages = cur.fetchall()
@@ -249,7 +254,7 @@ def send_message():
     sender_id = request.form['sender_id']
     content = request.form['content']
     file = request.files.get('file')
-    is_admin = request.form.get('is_admin') == 'true'
+    is_admin = request.form.get('is_admin', 'false') == 'true'
     
     file_path = None
     if file:
@@ -260,10 +265,16 @@ def send_message():
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute(
-        "INSERT INTO messages (chat_id, sender_id, content) VALUES (%s, %s, %s) RETURNING id",
-        (chat_id, sender_id, content)
+        """
+        INSERT INTO messages (chat_id, sender_id, content, is_admin) 
+        VALUES (%s, %s, %s, %s) 
+        RETURNING id, timestamp
+        """,
+        (chat_id, sender_id, content, is_admin)
     )
-    message_id = cur.fetchone()[0]
+    message_data = cur.fetchone()
+    message_id = message_data[0]
+    timestamp = message_data[1].strftime('%Y-%m-%d %H:%M:%S')
     
     if file_path:
         cur.execute("INSERT INTO attachments (message_id, file_path) VALUES (%s, %s)", (message_id, file_path))
@@ -276,17 +287,22 @@ def send_message():
     
     # Obtener información del mensaje para enviar por SocketIO
     cur.execute(
-        "SELECT m.content, m.timestamp, u.name, u.surname, a.file_path, u.is_admin "
-        "FROM messages m JOIN users u ON m.sender_id = u.id "
-        "LEFT JOIN attachments a ON m.id = a.message_id "
-        "WHERE m.id = %s",
+        """
+        SELECT m.content, m.timestamp, u.name, u.surname, a.file_path, m.is_admin
+        FROM messages m JOIN users u ON m.sender_id = u.id 
+        LEFT JOIN attachments a ON m.id = a.message_id 
+        WHERE m.id = %s
+        """,
         (message_id,)
     )
     message = cur.fetchone()
     # Obtener información del chat para actualizar la barra lateral
     cur.execute(
-        "SELECT c.id, u.name, u.phone, c.unread, c.status "
-        "FROM chats c JOIN users u ON c.user_id = u.id WHERE c.id = %s",
+        """
+        SELECT c.id, u.name, u.phone, c.unread, c.status
+        FROM chats c JOIN users u ON c.user_id = u.id 
+        WHERE c.id = %s
+        """,
         (chat_id,)
     )
     chat = cur.fetchone()
@@ -302,7 +318,7 @@ def send_message():
         'surname': message[3],
         'file_path': message[4],
         'is_user': not message[5]  # True si NO es admin (es usuario regular)
-    }, room=str(chat_id))
+    }, room=str(chat_id), namespace='/')
     
     # Emitir evento de actualización de chats
     socketio.emit('new_chat', {
@@ -313,13 +329,14 @@ def send_message():
         'status': chat[4]
     }, namespace='/')
     
-    return '', 204
+    return jsonify({'status': 'success'}), 200
 
 # SocketIO para unirse a una sala
 @socketio.on('join')
 def on_join(data):
     chat_id = data['chat_id']
     join_room(str(chat_id))
+    print(f"Client joined room {chat_id}, SID: {request.sid}")
 
 if __name__ == '__main__':
     socketio.run(app, debug=True)

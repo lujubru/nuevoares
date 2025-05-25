@@ -81,6 +81,7 @@
         });
         
         socket.on('new_message', function(data) {
+            console.log('New message received:', data);
             const messageDiv = document.createElement('div');
             messageDiv.className = 'flex mb-2 ' + (data.is_user ? 'justify-start' : 'justify-end');
             messageDiv.innerHTML = `
@@ -102,6 +103,10 @@
             const message = messageInput.value;
             if (!message && !fileInput.files[0]) return;
             
+            // Limpiar los campos inmediatamente después del envío
+            messageInput.value = '';
+            fileInput.value = '';
+            
             const formData = new FormData();
             formData.append('chat_id', {{ chat_id }});
             formData.append('sender_id', {{ session['admin_id'] }});
@@ -114,11 +119,20 @@
             fetch('/send_message', {
                 method: 'POST',
                 body: formData
-            }).then(() => {
-                messageInput.value = '';
-                fileInput.value = '';
-                setTimeout(scrollToBottom, 100);
-            });
+            }).then(response => response.json())
+              .then(data => {
+                  if (data.status === 'success') {
+                      console.log('Message sent successfully');
+                  } else {
+                      console.error('Error sending message:', data);
+                      // Restaurar el mensaje si falla (opcional)
+                      messageInput.value = message;
+                  }
+              }).catch(error => {
+                  console.error('Fetch error:', error);
+                  // Restaurar el mensaje si falla (opcional)
+                  messageInput.value = message;
+              });
         });
         
         // Escuchar eventos de nuevos chats o actualizaciones
