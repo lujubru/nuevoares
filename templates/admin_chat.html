@@ -1,5 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Chat Admin{% endblock %}
+{% block head %}
+    {{ super() }}
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+{% endblock %}
 {% block sidebar %}
 <div id="sidebar-chats" class="bg-black text-white w-full sm:w-64 p-3 sm:p-4 overflow-y-auto">
     <h3 class="text-base sm:text-lg font-semibold mb-4 text-yellow-500">Chats Abiertos</h3>
@@ -52,7 +59,12 @@
     </div>
 </div>
 <script>
-    const socket = io();
+    const socket = io({
+        reconnection: true,
+        reconnectionAttempts: Infinity,
+        reconnectionDelay: 1000,
+        transports: ['websocket']
+    });
     const chatContainer = document.getElementById('chat-container');
     
     // Función para hacer scroll hacia abajo
@@ -71,6 +83,9 @@
             .then(response => response.text())
             .then(html => {
                 document.getElementById('sidebar-chats').innerHTML = html;
+            })
+            .catch(error => {
+                console.error('Error updating sidebar:', error);
             });
     }
     
@@ -78,6 +93,11 @@
         socket.emit('join', { chat_id: {{ chat_id }} });
         socket.on('connect', () => {
             console.log('Connected to SocketIO, joined room {{ chat_id }}');
+            socket.emit('join', { chat_id: {{ chat_id }} }); // Re-join en reconexión
+        });
+        
+        socket.on('disconnect', () => {
+            console.log('Disconnected from SocketIO');
         });
         
         socket.on('new_message', function(data) {
@@ -95,6 +115,14 @@
             chatContainer.appendChild(messageDiv);
             setTimeout(scrollToBottom, 50);
         });
+        
+        // Heartbeat para verificar la conexión
+        setInterval(() => {
+            if (!socket.connected) {
+                console.log('Attempting to reconnect...');
+                socket.connect();
+            }
+        }, 30000);
         
         document.getElementById('message-form').addEventListener('submit', function(e) {
             e.preventDefault();
@@ -125,13 +153,13 @@
                       console.log('Message sent successfully');
                   } else {
                       console.error('Error sending message:', data);
-                      // Restaurar el mensaje si falla (opcional)
-                      messageInput.value = message;
+                      alert('Error al enviar el mensaje. Intenta de nuevo.');
+                      messageInput.value = message; // Restaurar mensaje si falla
                   }
               }).catch(error => {
                   console.error('Fetch error:', error);
-                  // Restaurar el mensaje si falla (opcional)
-                  messageInput.value = message;
+                  alert('Error de conexión. Verifica tu red e intenta de nuevo.');
+                  messageInput.value = message; // Restaurar mensaje si falla
               });
         });
         
