@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Dashboard Admin{% endblock %}
+{% block sidebar %}
+<div class="sidebar">
+    <h3>Chats Abiertos</h3>
+    {% for chat in chats %}
+        <a href="{{ url_for('admin_chat', chat_id=chat[0]) }}" class="{% if chat[4] %}unread{% endif %}">
+            {{ chat[1] }} {{ chat[2] }} ({{ chat[3] }})
+            {% if chat[4] %}<span>(No leído)</span>{% endif %}
+        </a>
+    {% endfor %}
+</div>
+{% endblock %}
+{% block content %}
+<div class="max-w-2xl mx-auto bg-white p-6 rounded-lg shadow-md">
+    <h2 class="text-xl font-semibold mb-4">Dashboard Admin</h2>
+    <p>Selecciona un chat de la barra lateral para responder.</p>
+    <a href="{{ url_for('admin_login') }}" class="text-teal-500 underline">Cerrar Sesión</a>
+</div>
+{% endblock %}

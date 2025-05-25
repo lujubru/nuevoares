@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Administración</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.1/socket.io.js"></script>
+    <style>
+        .chat-container {
+            max-height: 70vh;
+            overflow-y: auto;
+            scroll-behavior: smooth;
+        }
+        .message-sent {
+            background-color: #DCF8C6;
+            margin-left: auto;
+            border-radius: 10px 10px 0 10px;
+        }
+        .message-received {
+            background-color: #ECECEC;
+            margin-right: auto;
+            border-radius: 10px 10px 10px 0;
+        }
+        .sidebar {
+            width: 300px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+                max-height: 30vh;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex flex-col min-h-screen">
+    <div class="container mx-auto p-4 flex-grow">
+        <h1 class="text-2xl font-bold text-center text-blue-600 mb-4">Panel de Administración</h1>
+        <div class="flex flex-col md:flex-row gap-4">
+            <!-- Sidebar: Lista de usuarios con chats -->
+            <div class="sidebar bg-white shadow-lg rounded-lg p-4">
+                <h2 class="text-xl font-semibold mb-4">Chats</h2>
+                {% if usuarios %}
+                    <div class="space-y-2">
+                        {% for usuario in usuarios %}
+                            <a href="{{ url_for('admin_panel', usuario_id=usuario.id) }}" 
+                               class="block p-4 bg-gray-50 hover:bg-gray-100 rounded-lg border border-gray-200 {% if usuario_id == usuario.id %}bg-blue-100{% endif %}">
+                                <p class="font-semibold text-blue-600">{{ usuario.nombre }} {{ usuario.apellido }}</p>
+                                <p class="text-sm text-gray-600">Teléfono: {{ usuario.telefono }}</p>
+                                <p class="text-sm text-gray-800 truncate">{{ usuario.ultimo_mensaje }}</p>
+                                <p class="text-xs text-gray-500">{{ usuario.ultima_fecha.strftime('%Y-%m-%d %H:%M') if usuario.ultima_fecha else '' }}</p>
+                            </a>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-gray-600">No hay chats activos.</p>
+                {% endif %}
+            </div>
+            <!-- Área de chat -->
+            <div class="flex-grow bg-white shadow-lg rounded-lg p-4">
+                {% if selected_usuario %}
+                    <h2 class="text-xl font-semibold mb-4">Chat con {{ selected_usuario.nombre }} {{ selected_usuario.apellido }}</h2>
+                    <div id="chat-messages" class="chat-container mb-4 p-4 bg-gray-50 rounded-lg">
+                        {% for consulta in consultas %}
+                            <div class="{% if consulta.respuesta %}message-sent{% else %}message-received{% endif %} p-3 mb-2 max-w-[70%]">
+                                <p class="text-sm text-gray-600">{{ consulta.creado_en.strftime('%Y-%m-%d %H:%M') }}</p>
+                                <p>{{ consulta.mensaje }}</p>
+                                {% if consulta.archivo_ruta %}
+                                    <a href="/{{ consulta.archivo_ruta }}" target="_blank" class="text-blue-600 underline">Ver archivo: {{ consulta.archivo_nombre }}</a>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                    </div>
+                    <form id="chat-form" class="flex gap-2 mb-2">
+                        <input type="text" id="mensaje" name="mensaje" class="flex-grow p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Escribe tu respuesta..." required>
+                        <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Enviar</button>
+                    </form>
+                    <form action="{{ url_for('finalizar_consulta', usuario_id=selected_usuario.id) }}" method="POST" class="flex justify-end">
+                        <button type="submit" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">Finalizar Consulta</button>
+                    </form>
+                {% else %}
+                    <p class="text-gray-600">Selecciona un chat para comenzar.</p>
+                {% endif %}
+            </div>
+        </div>
+        <a href="{{ url_for('admin_login') }}" class="mt-4 inline-block text-blue-600 hover:underline">Cerrar sesión</a>
+    </div>
+    <script>
+        const socket = io();
+
+        socket.on('connect', () => {
+            console.log('Conectado al servidor WebSocket');
+        });
+
+        socket.on('new_message', (data) => {
+            console.log('Mensaje recibido en admin:', data); // Depuración
+            if (data.usuario_id === {{ selected_usuario.id if selected_usuario else 0 }}) {
+                const chatMessages = document.getElementById('chat-messages');
+                if (chatMessages) {
+                    const messageDiv = document.createElement('div');
+                    messageDiv.className = data.is_admin ? 'message-sent p-3 mb-2 max-w-[70%]' : 'message-received p-3 mb-2 max-w-[70%]';
+                    messageDiv.innerHTML = `
+                        <p class="text-sm text-gray-600">${new Date(data.created_at).toLocaleString()}</p>
+                        <p>${data.message}</p>
+                        ${data.archivo_ruta ? `<a href="/${data.archivo_ruta}" target="_blank" class="text-blue-600 underline">Ver archivo: ${data.archivo_nombre}</a>` : ''}
+                    `;
+                    chatMessages.appendChild(messageDiv);
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                }
+            }
+        });
+
+        const chatForm = document.getElementById('chat-form');
+        if (chatForm) {
+            chatForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                console.log('Enviando mensaje administrador'); // Depuración
+                const mensaje = document.getElementById('mensaje').value;
+                if (mensaje.trim()) {
+                    socket.emit('send_admin_message', { 
+                        mensaje: mensaje, 
+                        usuario_id: {{ selected_usuario.id if selected_usuario else 0 }}
+                    });
+                    document.getElementById('mensaje').value = '';
+                }
+            });
+        }
+    </script>
+</body>
+</html>

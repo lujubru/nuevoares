@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}Chat de Ayuda{% endblock %}
+{% block content %}
+<div class="min-h-screen flex flex-col">
+    <!-- Encabezado -->
+    <div class="bg-gray-900 text-white p-4 flex items-center shadow-lg">
+        <h2 class="text-lg font-semibold">Chat con {{ user[0] }} {{ user[1] }}</h2>
+    </div>
+    <!-- Contenedor de mensajes -->
+    <div id="chat-container" class="flex-1 p-4 overflow-y-auto flex flex-col space-y-2">
+        {% for message in messages %}
+            <div class="flex mb-3 {% if message[2] == user[0] and message[3] == user[1] %}justify-end{% else %}justify-start{% endif %}">
+                <div class="max-w-xs p-3 rounded-lg shadow-md relative {% if message[2] == user[0] and message[3] == user[1] %}bg-yellow-600 text-black{% else %}bg-blue-900 text-white{% endif %}">
+                    <p class="text-sm">{{ message[0] }}</p>
+                    {% if message[4] %}
+                        <a href="{{ url_for('static', filename=message[4] | replace('static/', '')) }}" target="_blank" class="text-red-400 text-xs underline">Ver archivo</a>
+                    {% endif %}
+                    <p class="text-xs text-gray-300 mt-1">{{ message[1].strftime('%H:%M') }}</p>
+                    <div class="absolute bottom-0 {% if message[2] == user[0] and message[3] == user[1] %}right-[-8px] border-l-8 border-l-yellow-600{% else %}left-[-8px] border-r-8 border-r-blue-900{% endif %} border-b-8 border-b-transparent w-0 h-0"></div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+    <!-- Formulario de entrada -->
+    <div class="bg-gray-800 p-4 border-t border-gray-700">
+        <form id="message-form" enctype="multipart/form-data" class="flex items-center space-x-2">
+            <div class="flex-1 bg-gray-900 rounded-lg shadow-sm flex items-center px-3 border border-yellow-500">
+                <input type="text" id="message" class="flex-1 p-2 text-sm bg-transparent text-white outline-none" placeholder="Escribe un mensaje...">
+                <label for="file" class="text-yellow-500 cursor-pointer">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 002.828 2.828l6.586-6.586a4 4 0 00-5.656-5.656L5.586 10.758a6 6 0 008.486 8.486L20.658 12.17"></path></svg>
+                </label>
+                <input type="file" id="file" class="hidden">
+            </div>
+            <button type="submit" class="bg-red-500 text-white rounded-full p-2 hover:bg-red-600 transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+            </button>
+        </form>
+    </div>
+</div>
+<script>
+    const socket = io();
+    const chatContainer = document.getElementById('chat-container');
+    
+    // Función para hacer scroll hacia abajo
+    function scrollToBottom() {
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+    
+    // Scroll inicial al cargar la página
+    window.addEventListener('load', function() {
+        setTimeout(scrollToBottom, 100);
+    });
+    
+    socket.emit('join', { chat_id: {{ session['chat_id'] }} });
+    socket.on('connect', () => {
+        console.log('Connected to SocketIO, joined room {{ session['chat_id'] }}');
+    });
+    
+    socket.on('new_message', function(data) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'flex mb-3 ' + (data.name === '{{ user[0] }}' && data.surname === '{{ user[1] }}' ? 'justify-end' : 'justify-start');
+        messageDiv.innerHTML = `
+            <div class="max-w-xs p-3 rounded-lg shadow-md relative ${data.name === '{{ user[0] }}' && data.surname === '{{ user[1] }}' ? 'bg-yellow-600 text-black' : 'bg-blue-900 text-white'}">
+                <p class="text-sm">${data.content}</p>
+                ${data.file_path ? `<a href="/static/${data.file_path.replace('static/', '')}" target="_blank" class="text-red-400 text-xs underline">Ver archivo</a>` : ''}
+                <p class="text-xs text-gray-300 mt-1">${data.timestamp.split(' ')[1].slice(0, 5)}</p>
+                <div class="absolute bottom-0 ${data.name === '{{ user[0] }}' && data.surname === '{{ user[1] }}' ? 'right-[-8px] border-l-8 border-l-yellow-600' : 'left-[-8px] border-r-8 border-r-blue-900'} border-b-8 border-b-transparent w-0 h-0"></div>
+            </div>
+        `;
+        chatContainer.appendChild(messageDiv);
+        
+        // Hacer scroll hacia abajo después de agregar el mensaje
+        setTimeout(scrollToBottom, 50);
+    });
+    
+    document.getElementById('message-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const messageInput = document.getElementById('message');
+        const fileInput = document.getElementById('file');
+        const message = messageInput.value;
+        if (!message && !fileInput.files[0]) return;
+        
+        const formData = new FormData();
+        formData.append('chat_id', {{ session['chat_id'] }});
+        formData.append('sender_id', {{ session['user_id'] }});
+        formData.append('content', message);
+        if (fileInput.files[0]) {
+            formData.append('file', fileInput.files[0]);
+        }
+        
+        fetch('/send_message', {
+            method: 'POST',
+            body: formData
+        }).then(() => {
+            socket.emit('send_message', {
+                chat_id: {{ session['chat_id'] }},
+                sender_id: {{ session['user_id'] }},
+                content: message,
+                file: fileInput.files[0] ? { name: fileInput.files[0].name, data: fileInput.files[0] } : null
+            });
+            messageInput.value = '';
+            fileInput.value = '';
+            
+            // Hacer scroll hacia abajo después de enviar
+            setTimeout(scrollToBottom, 100);
+        });
+    });
+</script>
+{% endblock %}

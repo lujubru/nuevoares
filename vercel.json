@@ -1,0 +1,19 @@
+{
+    "version": 2,
+    "builds": [
+        {
+            "src": "app.py",
+            "use": "@vercel/python"
+        }
+    ],
+    "routes": [
+        {
+            "src": "/(.*)",
+            "dest": "app.py"
+        }
+    ],
+    "env": {
+        "DATABASE_URL": "postgresql://postgres:FuwGWPHBNOpaFihQZCtgzgZvBYudDzVW@hopper.proxy.rlwy.net:45559/railway",
+        "SECRET_KEY": "20060920"
+    }
+}
