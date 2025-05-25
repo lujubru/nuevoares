@@ -44,7 +44,7 @@ def admin_setup():
             SET password = EXCLUDED.password
             RETURNING id
             """,
-            ('Admin', 'Default', '1234567890', username, hashed_password, True)
+            ('Admin', '', '1234567890', username, hashed_password, True)
         )
         admin_id = cur.fetchone()
         conn.commit()
@@ -61,7 +61,6 @@ def admin_setup():
 def index():
     if request.method == 'POST':
         name = request.form['name']
-        surname = request.form['surname']
         phone = request.form['phone']
         conn = get_db_connection()
         cur = conn.cursor()
@@ -70,10 +69,10 @@ def index():
             INSERT INTO users (name, surname, phone)
             VALUES (%s, %s, %s)
             ON CONFLICT (phone) DO UPDATE
-            SET name = EXCLUDED.name, surname = EXCLUDED.surname
+            SET name = EXCLUDED.name
             RETURNING id
             """,
-            (name, surname, phone)
+            (name, '', phone)
         )
         user_id = cur.fetchone()
         if not user_id:
@@ -141,7 +140,7 @@ def user_chat():
         return redirect(url_for('index'))
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("SELECT name, surname FROM users WHERE id = %s", (session['user_id'],))
+    cur.execute("SELECT name FROM users WHERE id = %s", (session['user_id'],))
     user = cur.fetchone()
     cur.execute(
         "SELECT m.content, m.timestamp, u.name, u.surname, a.file_path "
@@ -163,7 +162,7 @@ def admin_dashboard():
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute(
-        "SELECT c.id, u.name, u.surname, u.phone, c.unread, c.status "
+        "SELECT c.id, u.name, u.phone, c.unread, c.status "
         "FROM chats c JOIN users u ON c.user_id = u.id WHERE c.status = 'open'"
     )
     chats = cur.fetchall()
@@ -188,10 +187,10 @@ def admin_chat(chat_id):
         (chat_id,)
     )
     messages = cur.fetchall()
-    cur.execute("SELECT u.name, u.surname, u.phone FROM users u JOIN chats c ON u.id = c.user_id WHERE c.id = %s", (chat_id,))
+    cur.execute("SELECT u.name, u.phone FROM users u JOIN chats c ON u.id = c.user_id WHERE c.id = %s", (chat_id,))
     user = cur.fetchone()
     cur.execute(
-        "SELECT c.id, u.name, u.surname, u.phone, c.unread, c.status "
+        "SELECT c.id, u.name, u.phone, c.unread, c.status "
         "FROM chats c JOIN users u ON c.user_id = u.id WHERE c.status = 'open'"
     )
     chats = cur.fetchall()
