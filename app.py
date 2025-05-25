@@ -179,18 +179,19 @@ def admin_chat(chat_id):
     cur = conn.cursor()
     cur.execute("UPDATE chats SET unread = FALSE WHERE id = %s", (chat_id,))
     conn.commit()
+    # Modificar la consulta para incluir información sobre si el usuario es admin
     cur.execute(
-        "SELECT m.content, m.timestamp, u.name, u.surname, a.file_path "
+        "SELECT m.content, m.timestamp, u.name, u.surname, a.file_path, u.is_admin "
         "FROM messages m JOIN users u ON m.sender_id = u.id "
         "LEFT JOIN attachments a ON m.id = a.message_id "
         "WHERE m.chat_id = %s ORDER BY m.timestamp",
         (chat_id,)
     )
     messages = cur.fetchall()
-    cur.execute("SELECT u.name, u.phone FROM users u JOIN chats c ON u.id = c.user_id WHERE c.id = %s", (chat_id,))
+    cur.execute("SELECT u.name, u.surname, u.phone FROM users u JOIN chats c ON u.id = c.user_id WHERE c.id = %s", (chat_id,))
     user = cur.fetchone()
     cur.execute(
-        "SELECT c.id, u.name, u.phone, c.unread, c.status "
+        "SELECT c.id, u.name, u.surname, u.phone, c.unread, c.status "
         "FROM chats c JOIN users u ON c.user_id = u.id WHERE c.status = 'open'"
     )
     chats = cur.fetchall()
@@ -218,12 +219,14 @@ def send_message():
     sender_id = request.form['sender_id']
     content = request.form['content']
     file = request.files.get('file')
-    is_admin = 'admin_id' in session
+    is_admin = request.form.get('is_admin') == 'true'
+    
     file_path = None
     if file:
         filename = secure_filename(file.filename)
         file_path = os.path.join('uploads', f"{uuid.uuid4()}_{filename}")
         file.save(os.path.join('static', file_path))
+    
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute(
@@ -231,41 +234,19 @@ def send_message():
         (chat_id, sender_id, content)
     )
     message_id = cur.fetchone()[0]
+    
     if file_path:
         cur.execute("INSERT INTO attachments (message_id, file_path) VALUES (%s, %s)", (message_id, file_path))
-    cur.execute("UPDATE chats SET unread = TRUE WHERE id = %s AND %s = FALSE", (chat_id, is_admin))
+    
+    # Solo marcar como no leído si NO es un admin quien envía
+    if not is_admin:
+        cur.execute("UPDATE chats SET unread = TRUE WHERE id = %s", (chat_id,))
+    
     conn.commit()
-    cur.close()
-    conn.close()
-    return '', 204
-
-# SocketIO para mensajes en tiempo real
-@socketio.on('send_message')
-def handle_message(data):
-    chat_id = data['chat_id']
-    sender_id = data['sender_id']
-    content = data['content']
-    is_admin = data.get('is_admin', False)
-    file = data.get('file')
-    file_path = None
-    if file:
-        filename = secure_filename(file['name'])
-        file_path = os.path.join('uploads', f"{uuid.uuid4()}_{filename}")
-        with open(os.path.join('static', file_path), 'wb') as f:
-            f.write(file['data'])
-    conn = get_db_connection()
-    cur = conn.cursor()
+    
+    # Obtener información del mensaje para enviar por SocketIO
     cur.execute(
-        "INSERT INTO messages (chat_id, sender_id, content) VALUES (%s, %s, %s) RETURNING id",
-        (chat_id, sender_id, content)
-    )
-    message_id = cur.fetchone()[0]
-    if file_path:
-        cur.execute("INSERT INTO attachments (message_id, file_path) VALUES (%s, %s)", (message_id, file_path))
-    cur.execute("UPDATE chats SET unread = TRUE WHERE id = %s AND %s = FALSE", (chat_id, is_admin))
-    conn.commit()
-    cur.execute(
-        "SELECT m.content, m.timestamp, u.name, u.surname, a.file_path "
+        "SELECT m.content, m.timestamp, u.name, u.surname, a.file_path, u.is_admin "
         "FROM messages m JOIN users u ON m.sender_id = u.id "
         "LEFT JOIN attachments a ON m.id = a.message_id "
         "WHERE m.id = %s",
@@ -274,15 +255,21 @@ def handle_message(data):
     message = cur.fetchone()
     cur.close()
     conn.close()
+    
+    # Emitir el mensaje por SocketIO
     print(f"Emitting message to room {chat_id}: {message}")
-    emit('new_message', {
+    socketio.emit('new_message', {
         'content': message[0],
         'timestamp': message[1].strftime('%Y-%m-%d %H:%M:%S'),
         'name': message[2],
         'surname': message[3],
-        'file_path': message[4]
+        'file_path': message[4],
+        'is_user': not message[5]  # True si NO es admin (es usuario regular)
     }, room=str(chat_id))
+    
+    return '', 204
 
+# SocketIO para unirse a una sala
 @socketio.on('join')
 def on_join(data):
     chat_id = data['chat_id']
