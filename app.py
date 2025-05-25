@@ -27,6 +27,22 @@ def get_db_connection():
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
 
+# Nueva ruta para obtener la lista de chats en HTML para la barra lateral
+@app.route('/admin/get_chats')
+def get_chats():
+    if 'admin_id' not in session:
+        return '', 403
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT c.id, u.name, u.phone, c.unread, c.status "
+        "FROM chats c JOIN users u ON c.user_id = u.id WHERE c.status = 'open'"
+    )
+    chats = cur.fetchall()
+    cur.close()
+    conn.close()
+    return render_template('sidebar_chats.html', chats=chats)
+
 # Ruta para crear un admin por defecto
 @app.route('/admin/setup', methods=['GET', 'POST'])
 def admin_setup():
@@ -104,10 +120,24 @@ def index():
             chat_id = cur.fetchone()[0]
         
         conn.commit()
-        session['user_id'] = user_id
-        session['chat_id'] = chat_id
+        # Emitir evento SocketIO para notificar nuevo chat
+        cur.execute(
+            "SELECT c.id, u.name, u.phone, c.unread, c.status "
+            "FROM chats c JOIN users u ON c.user_id = u.id WHERE c.id = %s",
+            (chat_id,)
+        )
+        new_chat = cur.fetchone()
+        socketio.emit('new_chat', {
+            'id': new_chat[0],
+            'name': new_chat[1],
+            'phone': new_chat[2],
+            'unread': new_chat[3],
+            'status': new_chat[4]
+        }, namespace='/')
         cur.close()
         conn.close()
+        session['user_id'] = user_id
+        session['chat_id'] = chat_id
         return redirect(url_for('user_chat'))
     return render_template('index.html')
 
@@ -179,7 +209,6 @@ def admin_chat(chat_id):
     cur = conn.cursor()
     cur.execute("UPDATE chats SET unread = FALSE WHERE id = %s", (chat_id,))
     conn.commit()
-    # Modificar la consulta para incluir información sobre si el usuario es admin
     cur.execute(
         "SELECT m.content, m.timestamp, u.name, u.surname, a.file_path, u.is_admin "
         "FROM messages m JOIN users u ON m.sender_id = u.id "
@@ -210,6 +239,7 @@ def close_chat(chat_id):
     conn.commit()
     cur.close()
     conn.close()
+    socketio.emit('chat_closed', {'chat_id': chat_id}, namespace='/')
     return redirect(url_for('admin_dashboard'))
 
 # Ruta para enviar mensajes
@@ -253,6 +283,13 @@ def send_message():
         (message_id,)
     )
     message = cur.fetchone()
+    # Obtener información del chat para actualizar la barra lateral
+    cur.execute(
+        "SELECT c.id, u.name, u.phone, c.unread, c.status "
+        "FROM chats c JOIN users u ON c.user_id = u.id WHERE c.id = %s",
+        (chat_id,)
+    )
+    chat = cur.fetchone()
     cur.close()
     conn.close()
     
@@ -266,6 +303,15 @@ def send_message():
         'file_path': message[4],
         'is_user': not message[5]  # True si NO es admin (es usuario regular)
     }, room=str(chat_id))
+    
+    # Emitir evento de actualización de chats
+    socketio.emit('new_chat', {
+        'id': chat[0],
+        'name': chat[1],
+        'phone': chat[2],
+        'unread': chat[3],
+        'status': chat[4]
+    }, namespace='/')
     
     return '', 204
 
