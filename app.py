@@ -17,7 +17,7 @@ print("SECRET_KEY loaded:", secret_key)
 app.config['SECRET_KEY'] = secret_key
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", ping_timeout=10, ping_interval=5)
 
 # Conexión a PostgreSQL
 def get_db_connection():
@@ -337,6 +337,11 @@ def on_join(data):
     chat_id = data['chat_id']
     join_room(str(chat_id))
     print(f"Client joined room {chat_id}, SID: {request.sid}")
+
+# SocketIO para manejar desconexiones
+@socketio.on('disconnect')
+def on_disconnect():
+    print(f"Client disconnected, SID: {request.sid}")
 
 if __name__ == '__main__':
     socketio.run(app, debug=True)
