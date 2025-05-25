@@ -52,105 +52,116 @@
                 </label>
                 <input type="file" id="file" class="hidden">
             </div>
-            <button type="submit" class="bg-red-500 text-white rounded-full p-2 sm:p-2 hover:bg-red-600 transition" id="send-btn">
+            <button type="submit" class="bg-red-500 text-white rounded-full p-2 sm:p-2 hover:bg-red-600 transition">
                 <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
             </button>
         </form>
     </div>
 </div>
 <script>
-    // Variables globales
-    let socket;
-    let isConnected = false;
-    let reconnectAttempts = 0;
-    const maxReconnectAttempts = 10;
+    const socket = io({
+        reconnection: true,
+        reconnectionAttempts: Infinity,
+        reconnectionDelay: 1000,
+        transports: ['websocket']
+    });
     const chatContainer = document.getElementById('chat-container');
-    const messageForm = document.getElementById('message-form');
-    const messageInput = document.getElementById('message');
-    const fileInput = document.getElementById('file');
-    const sendBtn = document.getElementById('send-btn');
     
     // Función para hacer scroll hacia abajo
     function scrollToBottom() {
-        if (chatContainer) {
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-        }
+        chatContainer.scrollTop = chatContainer.scrollHeight;
     }
     
-    // Función para inicializar SocketIO
-    function initializeSocket() {
-        socket = io({
-            reconnection: true,
-            reconnectionAttempts: maxReconnectAttempts,
-            reconnectionDelay: 1000,
-            reconnectionDelayMax: 5000,
-            maxReconnectionAttempts: maxReconnectAttempts,
-            timeout: 20000,
-            forceNew: true,
-            transports: ['websocket', 'polling']
-        });
-        
-        socket.on('connect', function() {
-            console.log('Connected to SocketIO');
-            isConnected = true;
-            reconnectAttempts = 0;
-            
-            {% if chat_id is defined %}
-                socket.emit('join', { chat_id: {{ chat_id }} });
-            {% endif %}
-        });
-        
-        socket.on('disconnect', function(reason) {
-            console.log('Disconnected from SocketIO:', reason);
-            isConnected = false;
-        });
-        
-        socket.on('connect_error', function(error) {
-            console.log('Connection error:', error);
-            isConnected = false;
-        });
-        
-        socket.on('join_success', function(data) {
-            console.log('Successfully joined room:', data.room);
-        });
-        
-        socket.on('join_error', function(data) {
-            console.log('Error joining room:', data.error);
-        });
-        
-        {% if chat_id is defined %}
-            socket.on('new_message', function(data) {
-                console.log('New message received:', data);
-                
-                // Verificar que el mensaje es para este chat
-                if (data.chat_id && data.chat_id != {{ chat_id }}) {
-                    return;
-                }
-                
-                const messageDiv = document.createElement('div');
-                // data.is_user: true = usuario regular, false = admin
-                // Para el admin: mostrar mensajes de usuario a la izquierda, propios a la derecha
-                const isFromUser = data.is_user === true;
-                messageDiv.className = 'flex mb-2 ' + (isFromUser ? 'justify-start' : 'justify-end');
-                
-                const bgClass = isFromUser ? 'bg-blue-900 text-white' : 'bg-yellow-600 text-black';
-                const arrowClass = isFromUser ? 
-                    'left-[-6px] sm:left-[-8px] border-r-6 sm:border-r-8 border-r-blue-900' : 
-                    'right-[-6px] sm:right-[-8px] border-l-6 sm:border-l-8 border-l-yellow-600';
-                
-                messageDiv.innerHTML = `
-                    <div class="max-w-[70%] sm:max-w-xs p-2 sm:p-3 rounded-lg shadow-md relative ${bgClass}">
-                        <p class="text-xs sm:text-sm">${escapeHtml(data.content)}</p>
-                        ${data.file_path ? `<a href="/static/${data.file_path.replace('static/', '')}" target="_blank" class="text-red-400 text-xs underline">Ver archivo</a>` : ''}
-                        <p class="text-xs text-gray-300 mt-1">${formatTime(data.timestamp)}</p>
-                        <div class="absolute bottom-0 ${arrowClass} border-b-6 sm:border-b-8 border-b-transparent w-0 h-0"></div>
-                    </div>
-                `;
-                
-                chatContainer.appendChild(messageDiv);
-                setTimeout(scrollToBottom, 50);
+    // Scroll inicial al cargar la página
+    window.addEventListener('load', function() {
+        setTimeout(scrollToBottom, 100);
+    });
+    
+    // Función para actualizar la barra lateral
+    function updateSidebar() {
+        fetch('/admin/get_chats')
+            .then(response => response.text())
+            .then(html => {
+                document.getElementById('sidebar-chats').innerHTML = html;
+            })
+            .catch(error => {
+                console.error('Error updating sidebar:', error);
             });
-        {% endif %}
+    }
+    
+    {% if chat_id is defined %}
+        socket.emit('join', { chat_id: {{ chat_id }} });
+        socket.on('connect', () => {
+            console.log('Connected to SocketIO, joined room {{ chat_id }}');
+            socket.emit('join', { chat_id: {{ chat_id }} }); // Re-join en reconexión
+        });
+        
+        socket.on('disconnect', () => {
+            console.log('Disconnected from SocketIO');
+        });
+        
+        socket.on('new_message', function(data) {
+            console.log('New message received:', data);
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'flex mb-2 ' + (data.is_user ? 'justify-start' : 'justify-end');
+            messageDiv.innerHTML = `
+                <div class="max-w-[70%] sm:max-w-xs p-2 sm:p-3 rounded-lg shadow-md relative ${data.is_user ? 'bg-blue-900 text-white' : 'bg-yellow-600 text-black'}">
+                    <p class="text-xs sm:text-sm">${data.content}</p>
+                    ${data.file_path ? `<a href="/static/${data.file_path.replace('static/', '')}" target="_blank" class="text-red-400 text-xs underline">Ver archivo</a>` : ''}
+                    <p class="text-xs text-gray-300 mt-1">${data.timestamp.split(' ')[1].slice(0, 5)}</p>
+                    <div class="absolute bottom-0 ${data.is_user ? 'left-[-6px] sm:left-[-8px] border-r-6 sm:border-r-8 border-r-blue-900' : 'right-[-6px] sm:right-[-8px] border-l-6 sm:border-l-8 border-l-yellow-600'} border-b-6 sm:border-b-8 border-b-transparent w-0 h-0"></div>
+                </div>
+            `;
+            chatContainer.appendChild(messageDiv);
+            setTimeout(scrollToBottom, 50);
+        });
+        
+        // Heartbeat para verificar la conexión
+        setInterval(() => {
+            if (!socket.connected) {
+                console.log('Attempting to reconnect...');
+                socket.connect();
+            }
+        }, 30000);
+        
+        document.getElementById('message-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const messageInput = document.getElementById('message');
+            const fileInput = document.getElementById('file');
+            const message = messageInput.value;
+            if (!message && !fileInput.files[0]) return;
+            
+            // Limpiar los campos inmediatamente después del envío
+            messageInput.value = '';
+            fileInput.value = '';
+            
+            const formData = new FormData();
+            formData.append('chat_id', {{ chat_id }});
+            formData.append('sender_id', {{ session['admin_id'] }});
+            formData.append('content', message);
+            formData.append('is_admin', 'true');
+            if (fileInput.files[0]) {
+                formData.append('file', fileInput.files[0]);
+            }
+            
+            fetch('/send_message', {
+                method: 'POST',
+                body: formData
+            }).then(response => response.json())
+              .then(data => {
+                  if (data.status === 'success') {
+                      console.log('Message sent successfully');
+                  } else {
+                      console.error('Error sending message:', data);
+                      alert('Error al enviar el mensaje. Intenta de nuevo.');
+                      messageInput.value = message; // Restaurar mensaje si falla
+                  }
+              }).catch(error => {
+                  console.error('Fetch error:', error);
+                  alert('Error de conexión. Verifica tu red e intenta de nuevo.');
+                  messageInput.value = message; // Restaurar mensaje si falla
+              });
+        });
         
         // Escuchar eventos de nuevos chats o actualizaciones
         socket.on('new_chat', function(data) {
@@ -159,99 +170,12 @@
         
         // Escuchar eventos de chats cerrados
         socket.on('chat_closed', function(data) {
-            if (data.chat_id == {{ chat_id if chat_id is defined else 'null' }}) {
+            if (data.chat_id == {{ chat_id }}) {
                 window.location.href = '{{ url_for('admin_dashboard') }}';
             } else {
                 updateSidebar();
             }
         });
-    }
-    
-    // Función para escapar HTML
-    function escapeHtml(text) {
-        const map = {
-            '&': '&amp;',
-            '<': '&lt;',
-            '>': '&gt;',
-            '"': '&quot;',
-            "'": '&#039;'
-        };
-        return text.replace(/[&<>"']/g, function(m) { return map[m]; });
-    }
-    
-    // Función para formatear tiempo
-    function formatTime(timestamp) {
-        const date = new Date(timestamp);
-        return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-    }
-    
-    // Función para actualizar la barra lateral
-    function updateSidebar() {
-        fetch('/admin/get_chats')
-            .then(response => response.text())
-            .then(html => {
-                const sidebarElement = document.getElementById('sidebar-chats');
-                if (sidebarElement) {
-                    sidebarElement.innerHTML = html;
-                }
-            })
-            .catch(error => {
-                console.error('Error updating sidebar:', error);
-            });
-    }
-    
-    // Función para enviar mensaje
-    function sendMessage(event) {
-        event.preventDefault();
-        
-        const message = messageInput.value.trim();
-        const file = fileInput.files[0];
-        
-        if (!message && !file) {
-            return;
-        }
-        
-        // Deshabilitar el formulario mientras se envía
-        sendBtn.disabled = true;
-        messageInput.disabled = true;
-        
-        const formData = new FormData();
-        formData.append('chat_id', {{ chat_id if chat_id is defined else '0' }});
-        formData.append('sender_id', {{ session['admin_id'] if session.get('admin_id') else '0' }});
-        formData.append('content', message);
-        formData.append('is_admin', 'true');
-        if (file) {
-            formData.append('file', file);
-        }
-        
-        fetch('/send_message', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                console.log('Message sent successfully');
-                // Limpiar el formulario solo después del éxito
-                messageInput.value = '';
-                fileInput.value = '';
-            } else {
-                console.error('Error sending message:', data);
-                alert('Error al enviar el mensaje: ' + (data.message || 'Error desconocido'));
-            }
-        })
-        .catch(error => {
-            console.error('Fetch error:', error);
-            alert('Error de conexión. Verifica tu red e intenta de nuevo.');
-        })
-        .finally(() => {
-            // Rehabilitar el formulario
-            sendBtn.disabled = false;
-            messageInput.disabled = false;
-            messageInput.focus();
-        });
-    }
-    
-    // Inicialización cuando se carga la página
-    window.addEventListener('load', function() {
-        setTimeout(scrollTo
+    {% endif %}
+</script>
+{% endblock %}
