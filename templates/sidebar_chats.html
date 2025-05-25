@@ -1,0 +1,9 @@
+<div class="bg-black text-white w-full sm:w-64 p-3 sm:p-4 overflow-y-auto">
+    <h3 class="text-base sm:text-lg font-semibold mb-4 text-yellow-500">Chats Abiertos</h3>
+    {% for chat in chats %}
+        <a href="{{ url_for('admin_chat', chat_id=chat[0]) }}" class="block p-2 sm:p-3 rounded-lg mb-2 {% if chat[4] %}bg-red-600{% else %}bg-gray-800{% endif %} {% if chat_id is defined and chat[0] == chat_id %}bg-yellow-600{% endif %} hover:bg-gray-700 transition">
+            <span class="text-xs sm:text-sm">{{ chat[1] }} {{ chat[2] }} ({{ chat[3] }})</span>
+            {% if chat[4] %}<span class="text-xs bg-red-400 text-black px-1 rounded ml-2">No leído</span>{% endif %}
+        </a>
+    {% endfor %}
+</div>

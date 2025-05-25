@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Chat Admin{% endblock %}
 {% block sidebar %}
-<div class="bg-black text-white w-full sm:w-64 p-3 sm:p-4 overflow-y-auto">
+<div id="sidebar-chats" class="bg-black text-white w-full sm:w-64 p-3 sm:p-4 overflow-y-auto">
     <h3 class="text-base sm:text-lg font-semibold mb-4 text-yellow-500">Chats Abiertos</h3>
     {% for chat in chats %}
         <a href="{{ url_for('admin_chat', chat_id=chat[0]) }}" class="block p-2 sm:p-3 rounded-lg mb-2 {% if chat[4] %}bg-red-600{% else %}bg-gray-800{% endif %} {% if chat_id is defined and chat[0] == chat_id %}bg-yellow-600{% endif %} hover:bg-gray-700 transition">
@@ -65,6 +65,15 @@
         setTimeout(scrollToBottom, 100);
     });
     
+    // Función para actualizar la barra lateral
+    function updateSidebar() {
+        fetch('/admin/get_chats')
+            .then(response => response.text())
+            .then(html => {
+                document.getElementById('sidebar-chats').innerHTML = html;
+            });
+    }
+    
     {% if chat_id is defined %}
         socket.emit('join', { chat_id: {{ chat_id }} });
         socket.on('connect', () => {
@@ -73,7 +82,6 @@
         
         socket.on('new_message', function(data) {
             const messageDiv = document.createElement('div');
-            // Usar is_user para determinar la alineación (true = usuario, false = admin)
             messageDiv.className = 'flex mb-2 ' + (data.is_user ? 'justify-start' : 'justify-end');
             messageDiv.innerHTML = `
                 <div class="max-w-[70%] sm:max-w-xs p-2 sm:p-3 rounded-lg shadow-md relative ${data.is_user ? 'bg-blue-900 text-white' : 'bg-yellow-600 text-black'}">
@@ -81,11 +89,9 @@
                     ${data.file_path ? `<a href="/static/${data.file_path.replace('static/', '')}" target="_blank" class="text-red-400 text-xs underline">Ver archivo</a>` : ''}
                     <p class="text-xs text-gray-300 mt-1">${data.timestamp.split(' ')[1].slice(0, 5)}</p>
                     <div class="absolute bottom-0 ${data.is_user ? 'left-[-6px] sm:left-[-8px] border-r-6 sm:border-r-8 border-r-blue-900' : 'right-[-6px] sm:right-[-8px] border-l-6 sm:border-l-8 border-l-yellow-600'} border-b-6 sm:border-b-8 border-b-transparent w-0 h-0"></div>
-            </div>
+                </div>
             `;
             chatContainer.appendChild(messageDiv);
-            
-            // Hacer scroll hacia abajo después de agregar el mensaje
             setTimeout(scrollToBottom, 50);
         });
         
@@ -100,22 +106,33 @@
             formData.append('chat_id', {{ chat_id }});
             formData.append('sender_id', {{ session['admin_id'] }});
             formData.append('content', message);
-            formData.append('is_admin', 'true'); // Marcar como admin
+            formData.append('is_admin', 'true');
             if (fileInput.files[0]) {
                 formData.append('file', fileInput.files[0]);
             }
             
-            // Solo enviar por HTTP, no duplicar con SocketIO
             fetch('/send_message', {
                 method: 'POST',
                 body: formData
             }).then(() => {
                 messageInput.value = '';
                 fileInput.value = '';
-                
-                // Hacer scroll hacia abajo después de enviar
                 setTimeout(scrollToBottom, 100);
             });
+        });
+        
+        // Escuchar eventos de nuevos chats o actualizaciones
+        socket.on('new_chat', function(data) {
+            updateSidebar();
+        });
+        
+        // Escuchar eventos de chats cerrados
+        socket.on('chat_closed', function(data) {
+            if (data.chat_id == {{ chat_id }}) {
+                window.location.href = '{{ url_for('admin_dashboard') }}';
+            } else {
+                updateSidebar();
+            }
         });
     {% endif %}
 </script>
