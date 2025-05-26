@@ -1,6 +1,23 @@
 {% extends "base.html" %}
 {% block title %}Iniciar Consulta{% endblock %}
 {% block content %}
+<!-- Meta Pixel Code -->
+<script>
+!function(f,b,e,v,n,t,s)
+{if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];
+s.parentNode.insertBefore(t,s)}(window, document,'script',
+'https://connect.facebook.net/en_US/fbevents.js');
+fbq('init', '687508337431051');
+fbq('track', 'PageView');
+</script>
+<noscript><img height="1" width="1" style="display:none"
+src="https://www.facebook.com/tr?id=687508337431051&ev=PageView&noscript=1"
+/></noscript>
+<!-- End Meta Pixel Code -->
 <div class="max-w-4xl mx-auto bg-gradient-to-br from-teal-50 to-blue-50 p-8 rounded-xl shadow-lg border border-teal-100">
     <div class="flex flex-col md:flex-row gap-8">
         <!-- Columna izquierda: Formulario y WhatsApp -->
