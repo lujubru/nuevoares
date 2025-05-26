@@ -5,6 +5,58 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}{% endblock %}</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.4/socket.io.min.js"></script>
+    <!-- Meta Pixel Code -->
+    <script>
+        !function(f, b, e, v, n, t, s) {
+            // Verifica si fbq ya está definido para evitar duplicados
+            if (f.fbq) return;
+            
+            // Define la función fbq
+            n = f.fbq = function() {
+                n.callMethod ?
+                    n.callMethod.apply(n, arguments) :
+                    n.queue.push(arguments);
+            };
+            
+            // Inicializa _fbq si no existe
+            if (!f._fbq) f._fbq = n;
+            
+            // Configura propiedades de fbq
+            n.push = n;
+            n.loaded = !0;
+            n.version = '2.0';
+            n.queue = [];
+            
+            // Crea el elemento script para cargar fbevents.js
+            t = b.createElement(e);
+            t.async = !0;
+            t.src = v;
+            
+            // Inserta el script antes del primer elemento script en el DOM
+            s = b.getElementsByTagName(e)[0];
+            s.parentNode.insertBefore(t, s);
+        }(
+            window,
+            document,
+            'script',
+            'https://connect.facebook.net/en_US/fbevents.js'
+        );
+        
+        // Inicializa el Pixel con el ID proporcionado
+        fbq('init', '687508337431051');
+        
+        // Rastrea la vista de página
+        fbq('track', 'PageView');
+    </script>
+    <noscript>
+        <img 
+            height="1" 
+            width="1" 
+            style="display:none" 
+            src="https://www.facebook.com/tr?id=687508337431051&ev=PageView&noscript=1"
+        />
+    </noscript>
+    <!-- End Meta Pixel Code -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <style>
@@ -236,59 +288,6 @@
             }
         }
     </style>
-<!-- Meta Pixel Code -->
-<script>
-    !function(f, b, e, v, n, t, s) {
-        // Verifica si fbq ya está definido para evitar duplicados
-        if (f.fbq) return;
-        
-        // Define la función fbq
-        n = f.fbq = function() {
-            n.callMethod ?
-                n.callMethod.apply(n, arguments) :
-                n.queue.push(arguments);
-        };
-        
-        // Inicializa _fbq si no existe
-        if (!f._fbq) f._fbq = n;
-        
-        // Configura propiedades de fbq
-        n.push = n;
-        n.loaded = !0;
-        n.version = '2.0';
-        n.queue = [];
-        
-        // Crea el elemento script para cargar fbevents.js
-        t = b.createElement(e);
-        t.async = !0;
-        t.src = v;
-        
-        // Inserta el script antes del primer elemento script en el DOM
-        s = b.getElementsByTagName(e)[0];
-        s.parentNode.insertBefore(t, s);
-    }(
-        window,
-        document,
-        'script',
-        'https://connect.facebook.net/en_US/fbevents.js'
-    );
-    
-    // Inicializa el Pixel con el ID proporcionado
-    fbq('init', '687508337431051');
-    
-    // Rastrea la vista de página
-    fbq('track', 'PageView');
-</script>
-
-<noscript>
-    <img 
-        height="1" 
-        width="1" 
-        style="display:none" 
-        src="https://www.facebook.com/tr?id=687508337431051&ev=PageView&noscript=1"
-    />
-</noscript>
-<!-- End Meta Pixel Code -->
 </head>
 <body>
     <!-- Estrellas de fondo -->
