@@ -59,123 +59,107 @@
     </div>
 </div>
 <script>
-    const socket = io({
-        reconnection: true,
-        reconnectionAttempts: Infinity,
-        reconnectionDelay: 1000,
-        transports: ['websocket']
-    });
     const chatContainer = document.getElementById('chat-container');
-    
+    let lastMessageTimestamp = '';
+
     // Función para hacer scroll hacia abajo
     function scrollToBottom() {
         chatContainer.scrollTop = chatContainer.scrollHeight;
     }
-    
+
     // Scroll inicial al cargar la página
     window.addEventListener('load', function() {
         setTimeout(scrollToBottom, 100);
     });
-    
-    // Función para actualizar la barra lateral
-    function updateSidebar() {
+
+    // Función para añadir un mensaje al chat
+    function addMessage(data) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'flex mb-2 ' + (data.is_user ? 'justify-start' : 'justify-end');
+        messageDiv.innerHTML = `
+            <div class="max-w-[70%] sm:max-w-xs p-2 sm:p-3 rounded-lg shadow-md relative ${data.is_user ? 'bg-blue-900 text-white' : 'bg-yellow-600 text-black'}">
+                <p class="text-xs sm:text-sm">${data.content}</p>
+                ${data.file_path ? `<a href="/static/${data.file_path.replace('static/', '')}" target="_blank" class="text-red-400 text-xs underline">Ver archivo</a>` : ''}
+                <p class="text-xs text-gray-300 mt-1">${data.timestamp.split(' ')[1].slice(0, 5)}</p>
+                <div class="absolute bottom-0 ${data.is_user ? 'left-[-6px] sm:left-[-8px] border-r-6 sm:border-r-8 border-r-blue-900' : 'right-[-6px] sm:right-[-8px] border-l-6 sm:border-l-8 border-l-yellow-600'} border-b-6 sm:border-b-8 border-b-transparent w-0 h-0"></div>
+            </div>
+        `;
+        chatContainer.appendChild(messageDiv);
+        setTimeout(scrollToBottom, 50);
+    }
+
+    // Polling para obtener nuevos mensajes
+    function pollMessages() {
+        fetch('/get_messages/{{ chat_id }}')
+            .then(response => response.json())
+            .then(messages => {
+                messages.reverse().forEach(msg => {
+                    if (msg.timestamp > lastMessageTimestamp) {
+                        addMessage(msg);
+                        lastMessageTimestamp = msg.timestamp;
+                    }
+                });
+            })
+            .catch(error => {
+                console.error('Error polling messages:', error);
+            });
+    }
+
+    // Polling para actualizar la barra lateral
+    function pollSidebar() {
         fetch('/admin/get_chats')
             .then(response => response.text())
             .then(html => {
                 document.getElementById('sidebar-chats').innerHTML = html;
             })
             .catch(error => {
-                console.error('Error updating sidebar:', error);
+                console.error('Error polling sidebar:', error);
             });
     }
-    
-    {% if chat_id is defined %}
-        socket.emit('join', { chat_id: {{ chat_id }} });
-        socket.on('connect', () => {
-            console.log('Connected to SocketIO, joined room {{ chat_id }}');
-            socket.emit('join', { chat_id: {{ chat_id }} }); // Re-join en reconexión
-        });
+
+    // Iniciar polling cada 5 segundos
+    setInterval(pollMessages, 5000);
+    setInterval(pollSidebar, 5000);
+    pollMessages(); // Llamada inicial
+    pollSidebar(); // Llamada inicial
+
+    document.getElementById('message-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const messageInput = document.getElementById('message');
+        const fileInput = document.getElementById('file');
+        const message = messageInput.value;
+        if (!message && !fileInput.files[0]) return;
         
-        socket.on('disconnect', () => {
-            console.log('Disconnected from SocketIO');
-        });
+        // Limpiar los campos inmediatamente después del envío
+        messageInput.value = '';
+        fileInput.value = '';
         
-        socket.on('new_message', function(data) {
-            console.log('New message received:', data);
-            const messageDiv = document.createElement('div');
-            messageDiv.className = 'flex mb-2 ' + (data.is_user ? 'justify-start' : 'justify-end');
-            messageDiv.innerHTML = `
-                <div class="max-w-[70%] sm:max-w-xs p-2 sm:p-3 rounded-lg shadow-md relative ${data.is_user ? 'bg-blue-900 text-white' : 'bg-yellow-600 text-black'}">
-                    <p class="text-xs sm:text-sm">${data.content}</p>
-                    ${data.file_path ? `<a href="/static/${data.file_path.replace('static/', '')}" target="_blank" class="text-red-400 text-xs underline">Ver archivo</a>` : ''}
-                    <p class="text-xs text-gray-300 mt-1">${data.timestamp.split(' ')[1].slice(0, 5)}</p>
-                    <div class="absolute bottom-0 ${data.is_user ? 'left-[-6px] sm:left-[-8px] border-r-6 sm:border-r-8 border-r-blue-900' : 'right-[-6px] sm:right-[-8px] border-l-6 sm:border-l-8 border-l-yellow-600'} border-b-6 sm:border-b-8 border-b-transparent w-0 h-0"></div>
-                </div>
-            `;
-            chatContainer.appendChild(messageDiv);
-            setTimeout(scrollToBottom, 50);
-        });
+        const formData = new FormData();
+        formData.append('chat_id', {{ chat_id }});
+        formData.append('sender_id', {{ session['admin_id'] }});
+        formData.append('content', message);
+        formData.append('is_admin', 'true');
+        if (fileInput.files[0]) {
+            formData.append('file', fileInput.files[0]);
+        }
         
-        // Heartbeat para verificar la conexión
-        setInterval(() => {
-            if (!socket.connected) {
-                console.log('Attempting to reconnect...');
-                socket.connect();
-            }
-        }, 30000);
-        
-        document.getElementById('message-form').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const messageInput = document.getElementById('message');
-            const fileInput = document.getElementById('file');
-            const message = messageInput.value;
-            if (!message && !fileInput.files[0]) return;
-            
-            // Limpiar los campos inmediatamente después del envío
-            messageInput.value = '';
-            fileInput.value = '';
-            
-            const formData = new FormData();
-            formData.append('chat_id', {{ chat_id }});
-            formData.append('sender_id', {{ session['admin_id'] }});
-            formData.append('content', message);
-            formData.append('is_admin', 'true');
-            if (fileInput.files[0]) {
-                formData.append('file', fileInput.files[0]);
-            }
-            
-            fetch('/send_message', {
-                method: 'POST',
-                body: formData
-            }).then(response => response.json())
-              .then(data => {
-                  if (data.status === 'success') {
-                      console.log('Message sent successfully');
-                  } else {
-                      console.error('Error sending message:', data);
-                      alert('Error al enviar el mensaje. Intenta de nuevo.');
-                      messageInput.value = message; // Restaurar mensaje si falla
-                  }
-              }).catch(error => {
-                  console.error('Fetch error:', error);
-                  alert('Error de conexión. Verifica tu red e intenta de nuevo.');
-                  messageInput.value = message; // Restaurar mensaje si falla
-              });
-        });
-        
-        // Escuchar eventos de nuevos chats o actualizaciones
-        socket.on('new_chat', function(data) {
-            updateSidebar();
-        });
-        
-        // Escuchar eventos de chats cerrados
-        socket.on('chat_closed', function(data) {
-            if (data.chat_id == {{ chat_id }}) {
-                window.location.href = '{{ url_for('admin_dashboard') }}';
-            } else {
-                updateSidebar();
-            }
-        });
-    {% endif %}
+        fetch('/send_message', {
+            method: 'POST',
+            body: formData
+        }).then(response => response.json())
+          .then(data => {
+              if (data.status === 'success') {
+                  console.log('Message sent successfully');
+              } else {
+                  console.error('Error sending message:', data);
+                  alert('Error al enviar el mensaje. Intenta de nuevo.');
+                  messageInput.value = message;
+              }
+          }).catch(error => {
+              console.error('Fetch error:', error);
+              alert('Error de conexión. Verifica tu red e intenta de nuevo.');
+              messageInput.value = message;
+          });
+    });
 </script>
 {% endblock %}

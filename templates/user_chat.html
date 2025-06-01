@@ -45,13 +45,8 @@
     </div>
 </div>
 <script>
-    const socket = io({
-        reconnection: true,
-        reconnectionAttempts: Infinity,
-        reconnectionDelay: 1000,
-        transports: ['websocket']
-    });
     const chatContainer = document.getElementById('chat-container');
+    let lastMessageTimestamp = '';
 
     // Función para hacer scroll hacia abajo
     function scrollToBottom() {
@@ -63,18 +58,8 @@
         setTimeout(scrollToBottom, 100);
     });
 
-    socket.emit('join', { chat_id: {{ session['chat_id'] }} });
-    socket.on('connect', () => {
-        console.log('Connected to SocketIO, joined room {{ session['chat_id'] }}');
-        socket.emit('join', { chat_id: {{ session['chat_id'] }} }); // Re-join en reconexión
-    });
-
-    socket.on('disconnect', () => {
-        console.log('Disconnected from SocketIO');
-    });
-
-    socket.on('new_message', function(data) {
-        console.log('New message received:', data);
+    // Función para añadir un mensaje al chat
+    function addMessage(data) {
         const messageDiv = document.createElement('div');
         messageDiv.className = 'flex mb-2 ' + (data.is_user ? 'justify-end' : 'justify-start');
         messageDiv.innerHTML = `
@@ -87,15 +72,28 @@
         `;
         chatContainer.appendChild(messageDiv);
         setTimeout(scrollToBottom, 50);
-    });
+    }
 
-    // Heartbeat para verificar conexión
-    setInterval(() => {
-        if (!socket.connected) {
-            console.log('Attempting to reconnect...');
-            socket.connect();
-        }
-    }, 30000);
+    // Polling para obtener nuevos mensajes
+    function pollMessages() {
+        fetch('/get_messages/{{ session['chat_id'] }}')
+            .then(response => response.json())
+            .then(messages => {
+                messages.reverse().forEach(msg => {
+                    if (msg.timestamp > lastMessageTimestamp) {
+                        addMessage(msg);
+                        lastMessageTimestamp = msg.timestamp;
+                    }
+                });
+            })
+            .catch(error => {
+                console.error('Error polling messages:', error);
+            });
+    }
+
+    // Iniciar polling cada 5 segundos
+    setInterval(pollMessages, 5000);
+    pollMessages(); // Llamada inicial
 
     document.getElementById('message-form').addEventListener('submit', function(e) {
         e.preventDefault();
@@ -126,12 +124,12 @@
               } else {
                   console.error('Error sending message:', data);
                   alert('Error al enviar el mensaje. Intenta de nuevo.');
-                  messageInput.value = message; // Restaurar mensaje si falla
+                  messageInput.value = message;
               }
           }).catch(error => {
               console.error('Fetch error:', error);
               alert('Error de conexión. Verifica tu red e intenta de nuevo.');
-              messageInput.value = message; // Restaurar mensaje si falla
+              messageInput.value = message;
           });
     });
 </script>

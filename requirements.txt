@@ -1,6 +1,7 @@
-Flask
-psycopg2-binary
-bcrypt
-werkzeug
-python-dotenv
-Flask-SocketIO
+Flask==3.0.3
+psycopg2-binary==2.9.9
+bcrypt==4.2.0
+werkzeug==3.0.4
+python-dotenv==1.0.1
+Flask-SocketIO==5.3.6
+eventlet==0.36.1

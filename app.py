@@ -17,7 +17,7 @@ print("SECRET_KEY loaded:", secret_key)
 app.config['SECRET_KEY'] = secret_key
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB
-socketio = SocketIO(app, cors_allowed_origins="*", ping_timeout=60, ping_interval=25, logger=True, engineio_logger=True)
+socketio = SocketIO(app, cors_allowed_origins="*", ping_timeout=10, ping_interval=5)
 
 # Conexión a PostgreSQL
 def get_db_connection():
@@ -43,6 +43,34 @@ def get_chats():
     cur.close()
     conn.close()
     return render_template('sidebar_chats.html', chats=chats)
+
+# Nueva ruta para polling de mensajes
+@app.route('/get_messages/<int:chat_id>', methods=['GET'])
+def get_messages(chat_id):
+    if 'user_id' not in session and 'admin_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 403
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT m.content, m.timestamp, u.name, u.surname, a.file_path, m.is_admin
+        FROM messages m JOIN users u ON m.sender_id = u.id 
+        LEFT JOIN attachments a ON m.id = a.message_id 
+        WHERE m.chat_id = %s ORDER BY m.timestamp DESC LIMIT 50
+        """,
+        (chat_id,)
+    )
+    messages = cur.fetchall()
+    cur.close()
+    conn.close()
+    return jsonify([{
+        'content': msg[0],
+        'timestamp': msg[1].strftime('%Y-%m-%d %H:%M:%S'),
+        'name': msg[2],
+        'surname': msg[3],
+        'file_path': msg[4],
+        'is_user': not msg[5]
+    } for msg in messages])
 
 # Ruta para crear un admin por defecto
 @app.route('/admin/setup', methods=['GET', 'POST'])
@@ -247,126 +275,101 @@ def close_chat(chat_id):
     socketio.emit('chat_closed', {'chat_id': chat_id}, namespace='/')
     return redirect(url_for('admin_dashboard'))
 
-# Ruta para enviar mensajes - CORREGIDA
+# Ruta para enviar mensajes
 @app.route('/send_message', methods=['POST'])
 def send_message():
-    try:
-        chat_id = int(request.form['chat_id'])
-        sender_id = int(request.form['sender_id'])
-        content = request.form['content']
-        file = request.files.get('file')
-        is_admin = request.form.get('is_admin', 'false') == 'true'
-        
-        # Validar que el contenido no esté vacío
-        if not content.strip() and not file:
-            return jsonify({'status': 'error', 'message': 'Mensaje vacío'}), 400
-        
-        file_path = None
-        if file:
-            filename = secure_filename(file.filename)
-            file_path = os.path.join('uploads', f"{uuid.uuid4()}_{filename}")
-            file.save(os.path.join('static', file_path))
-        
-        conn = get_db_connection()
-        cur = conn.cursor()
-        
-        # Insertar el mensaje
-        cur.execute(
-            """
-            INSERT INTO messages (chat_id, sender_id, content, is_admin) 
-            VALUES (%s, %s, %s, %s) 
-            RETURNING id, timestamp
-            """,
-            (chat_id, sender_id, content, is_admin)
-        )
-        message_data = cur.fetchone()
-        message_id = message_data[0]
-        timestamp = message_data[1]
-        
-        # Insertar archivo adjunto si existe
-        if file_path:
-            cur.execute("INSERT INTO attachments (message_id, file_path) VALUES (%s, %s)", (message_id, file_path))
-        
-        # Solo marcar como no leído si NO es un admin quien envía
-        if not is_admin:
-            cur.execute("UPDATE chats SET unread = TRUE WHERE id = %s", (chat_id,))
-        
-        conn.commit()
-        
-        # Obtener información del usuario que envió el mensaje
-        cur.execute("SELECT name, surname FROM users WHERE id = %s", (sender_id,))
-        sender = cur.fetchone()
-        
-        cur.close()
-        conn.close()
-        
-        # Preparar datos del mensaje para SocketIO
-        message_data = {
-            'content': content,
-            'timestamp': timestamp.strftime('%Y-%m-%d %H:%M:%S'),
-            'name': sender[0] if sender else '',
-            'surname': sender[1] if sender else '',
-            'file_path': file_path,
-            'is_user': not is_admin,  # True si es usuario regular, False si es admin
-            'chat_id': chat_id
-        }
-        
-        print(f"Emitting message to room {chat_id}: {message_data}")
-        
-        # Emitir el mensaje a la sala específica del chat
-        socketio.emit('new_message', message_data, room=str(chat_id), namespace='/')
-        
-        # También emitir evento para actualizar la barra lateral
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute(
-            """
-            SELECT c.id, u.name, u.phone, c.unread, c.status
-            FROM chats c JOIN users u ON c.user_id = u.id 
-            WHERE c.id = %s
-            """,
-            (chat_id,)
-        )
-        chat = cur.fetchone()
-        cur.close()
-        conn.close()
-        
-        if chat:
-            socketio.emit('new_chat', {
-                'id': chat[0],
-                'name': chat[1],
-                'phone': chat[2],
-                'unread': chat[3],
-                'status': chat[4]
-            }, namespace='/')
-        
-        return jsonify({'status': 'success', 'message_id': message_id}), 200
-        
-    except Exception as e:
-        print(f"Error in send_message: {str(e)}")
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+    chat_id = request.form['chat_id']
+    sender_id = request.form['sender_id']
+    content = request.form['content']
+    file = request.files.get('file')
+    is_admin = request.form.get('is_admin', 'false') == 'true'
+    
+    file_path = None
+    if file:
+        filename = secure_filename(file.filename)
+        file_path = os.path.join('uploads', f"{uuid.uuid4()}_{filename}")
+        file.save(os.path.join('static', file_path))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO messages (chat_id, sender_id, content, is_admin) 
+        VALUES (%s, %s, %s, %s) 
+        RETURNING id, timestamp
+        """,
+        (chat_id, sender_id, content, is_admin)
+    )
+    message_data = cur.fetchone()
+    message_id = message_data[0]
+    timestamp = message_data[1].strftime('%Y-%m-%d %H:%M:%S')
+    
+    if file_path:
+        cur.execute("INSERT INTO attachments (message_id, file_path) VALUES (%s, %s)", (message_id, file_path))
+    
+    # Solo marcar como no leído si NO es un admin quien envía
+    if not is_admin:
+        cur.execute("UPDATE chats SET unread = TRUE WHERE id = %s", (chat_id,))
+    
+    conn.commit()
+    
+    # Obtener información del mensaje para enviar por SocketIO
+    cur.execute(
+        """
+        SELECT m.content, m.timestamp, u.name, u.surname, a.file_path, m.is_admin
+        FROM messages m JOIN users u ON m.sender_id = u.id 
+        LEFT JOIN attachments a ON m.id = a.message_id 
+        WHERE m.id = %s
+        """,
+        (message_id,)
+    )
+    message = cur.fetchone()
+    # Obtener información del chat para actualizar la barra lateral
+    cur.execute(
+        """
+        SELECT c.id, u.name, u.phone, c.unread, c.status
+        FROM chats c JOIN users u ON c.user_id = u.id 
+        WHERE c.id = %s
+        """,
+        (chat_id,)
+    )
+    chat = cur.fetchone()
+    cur.close()
+    conn.close()
+    
+    # Emitir el mensaje por SocketIO (para entornos que lo soporten)
+    print(f"Emitting message to room {chat_id}: {message}")
+    socketio.emit('new_message', {
+        'content': message[0],
+        'timestamp': message[1].strftime('%Y-%m-%d %H:%M:%S'),
+        'name': message[2],
+        'surname': message[3],
+        'file_path': message[4],
+        'is_user': not message[5]
+    }, room=str(chat_id), namespace='/')
+    
+    # Emitir evento de actualización de chats
+    socketio.emit('new_chat', {
+        'id': chat[0],
+        'name': chat[1],
+        'phone': chat[2],
+        'unread': chat[3],
+        'status': chat[4]
+    }, namespace='/')
+    
+    return jsonify({'status': 'success'}), 200
 
 # SocketIO para unirse a una sala
 @socketio.on('join')
 def on_join(data):
-    try:
-        chat_id = str(data['chat_id'])
-        join_room(chat_id)
-        print(f"Client joined room {chat_id}, SID: {request.sid}")
-        emit('join_success', {'room': chat_id})
-    except Exception as e:
-        print(f"Error joining room: {str(e)}")
-        emit('join_error', {'error': str(e)})
+    chat_id = data['chat_id']
+    join_room(str(chat_id))
+    print(f"Client joined room {chat_id}, SID: {request.sid}")
 
 # SocketIO para manejar desconexiones
 @socketio.on('disconnect')
 def on_disconnect():
     print(f"Client disconnected, SID: {request.sid}")
 
-# SocketIO para manejar conexiones
-@socketio.on('connect')
-def on_connect():
-    print(f"Client connected, SID: {request.sid}")
-
 if __name__ == '__main__':
-    socketio.run(app, debug=True, host='0.0.0.0', port=5000)
+    socketio.run(app, debug=True)
