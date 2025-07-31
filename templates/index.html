@@ -4,46 +4,7 @@
 <div class="max-w-4xl mx-auto bg-gray-900 text-white p-8 rounded-xl shadow-lg border border-gray-700">
     <div class="flex flex-col gap-6">
         <div class="w-full">
-            <div class="text-center mb-6">
-                <h2 class="text-2xl font-bold text-white mb-2">Iniciar Consulta</h2>
-                <p class="text-gray-300 text-sm">Completa tus datos para comenzar</p>
-            </div>
-            
-            {% with messages = get_flashed_messages() %}
-                {% if messages %}
-                    <div class="bg-red-100 border border-red-300 text-red-700 p-3 rounded-lg mb-4 flex items-center">
-                        <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
-                        </svg>
-                        {{ messages[0] }}
-                    </div>
-                {% endif %}
-            {% endwith %}
-            
-            <form method="POST" class="space-y-5">
-                <div>
-                    <label for="name" class="block text-sm font-semibold text-white mb-2">Nombre</label>
-                    <input type="text" name="name" id="name" required 
-                           class="w-full p-3 border-2 border-gray-700 rounded-lg focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200 transition-all duration-200 bg-white text-gray-900 placeholder-gray-500"
-                           placeholder="Ingresa tu nombre">
-                </div>
-                <div>
-                    <label for="phone" class="block text-sm font-semibold text-white mb-2">Teléfono</label>
-                    <input type="text" name="phone" id="phone" required 
-                           class="w-full p-3 border-2 border-gray-700 rounded-lg focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200 transition-all duration-200 bg-white text-gray-900 placeholder-gray-500"
-                           placeholder="Ingresa tu teléfono">
-                </div>
-                <button type="submit" 
-                        class="w-full bg-yellow-500 text-gray-900 p-3 rounded-lg hover:bg-yellow-600 transform hover:scale-105 transition-all duration-200 font-semibold shadow-lg">
-                    🚀 Iniciar Chat
-                </button>
-            </form>
-            
-            <div class="flex items-center my-6">
-                <div class="flex-grow border-t border-gray-700"></div>
-                <span class="flex-shrink mx-4 text-gray-300 text-sm font-medium">o también</span>
-                <div class="flex-grow border-t border-gray-700"></div>
-            </div>
+
             
             <a href="https://wa.me/5491178419956?text=Hola!%20Buenas!!%20vengo%20por%20mi%20usuario%20de%20la%20suerte%20&#x1F340" 
                target="_blank" 
