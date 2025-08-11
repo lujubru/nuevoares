@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Ayuda - Ares Club</title>
+    <style>
+        /* Mis mismos estilos para que quede idéntico al index */
+        *{ margin:0; padding:0; box-sizing:border-box; }
+        body{ font-family:'Arial', sans-serif; background: linear-gradient(135deg,#0a0a0a 0%,#1a1a1a 50%,#2a2a2a 100%); color:#ffffff; line-height:1.6; min-height:100vh; }
+        .header{ background: linear-gradient(90deg,#800000 0%,#cc0000 50%,#800000 100%); padding:1rem 0; box-shadow:0 4px 20px rgba(204,0,0,0.3); position:sticky; top:0; z-index:1000; }
+        .container{ max-width:1200px; margin:0 auto; padding:0 2rem; }
+        .section{ padding:4rem 0; }
+        .section-title{ font-size:2.2rem; text-align:center; margin-bottom:1.5rem; color:#ff0000; }
+        .text-content{ text-align:justify; margin:2rem 0; line-height:1.8; color:#dddddd; }
+        .faq{ margin-top:1rem; display:grid; gap:1rem; }
+        .faq-item{ background:rgba(255,255,255,0.03); padding:1rem; border-radius:8px; border-left:4px solid rgba(204,0,0,0.6); }
+        .contact-box{ text-align:center; margin-top:2rem; }
+        .cta-button{ background: linear-gradient(45deg,#cc0000,#ff0000,#cc0000); color:white; padding:1rem 2rem; border-radius:50px; text-decoration:none; font-weight:bold; display:inline-block; }
+        .footer{ background:#0a0a0a; padding:3rem 0; text-align:center; border-top:3px solid #cc0000; margin-top:2rem; }
+        .footer-links{ display:flex; justify-content:center; gap:2rem; margin-bottom:2rem; flex-wrap:wrap; }
+        .footer-links a{ color:#cccccc; text-decoration:none; transition:color 0.3s ease; }
+        .footer-links a:hover{ color:#ff0000; }
+        @media (max-width:768px){ .container{ padding:0 1rem; } .nav-links{ display:none; } }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <nav class="nav container">
+            <div class="logo"><img src="static/images/ares.png" alt="Ares Club Logo"></div>
+            <ul class="nav-links">
+                <li><a href="index.html">Inicio</a></li>
+                <li><a href="https://aresclub.net/casino/categories/Popular">Juegos</a></li>
+                <li><a href="https://aresclub.net/bonuses">Bonos</a></li>
+                <li><a href="https://wa.me/5491178419956">Contacto</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main class="section">
+        <div class="container">
+            <h1 class="section-title">Centro de Ayuda</h1>
+            <div class="text-content">
+                <p>¿Necesitás asistencia? Acá te dejamos las respuestas a las consultas más frecuentes y cómo contactarnos rápidamente.</p>
+
+                <div class="faq">
+                    <div class="faq-item">
+                        <h3>¿Cómo creo una cuenta?</h3>
+                        <p>Hacé click en "¡Crea tu Usuario Ahora!" en la página principal o comunicate por WhatsApp y el equipo te guiará paso a paso.</p>
+                    </div>
+                    <div class="faq-item">
+                        <h3>¿Qué documentos necesito para verificar mi cuenta?</h3>
+                        <p>Generalmente un documento de identidad (DNI/pasaporte) y, si corresponde, un comprobante de domicilio. El equipo te dirá exactamente qué solicitar según la verificación.</p>
+                    </div>
+                    <div class="faq-item">
+                        <h3>¿Cuánto tardan los retiros?</h3>
+                        <p>Los retiros se procesan en cuanto se valida la solicitud; en muchos casos son inmediatos una vez aprobada la transacción.</p>
+                    </div>
+                    <div class="faq-item">
+                        <h3>Problemas con un bono</h3>
+                        <p>Contactá soporte indicando tu usuario y el bono en cuestión. Revisaremos la situación y te daremos una solución.</p>
+                    </div>
+                </div>
+
+                <div class="contact-box">
+                    <p>Contactanos por correo o WhatsApp:</p>
+                    <p><strong>Correo:</strong> aresclub.net@gmail.com</p>
+                    <p><strong>WhatsApp:</strong> <a href="https://wa.me/5491178419956" class="cta-button">+54 9 11 7841 9956</a></p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-links">
+                <a href="terminos.html">Términos y Condiciones</a>
+                <a href="privacidad.html">Política de Privacidad</a>
+                <a href="juego-responsable.html">Juego Responsable</a>
+                <a href="ayuda.html">Ayuda</a>
+            </div>
+            <p>&copy; Ares Club™. Todos los derechos reservados.</p>
+            <p>Sitio web oficial para Argentina. Juega responsablemente. +18</p>
+        </div>
+    </footer>
+</body>
+</html>
