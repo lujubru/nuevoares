@@ -123,6 +123,7 @@ const ChatWidget = ({ user }) => {
           <div className="chat-notification">
             <span>Chat de Soporte</span>
             {isConnected && <div className="online-indicator"></div>}
+            }
           </div>
         )}
       </div>
