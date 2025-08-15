@@ -132,6 +132,23 @@ function App() {
             <li><a href="#bonos">Bonos</a></li>
             <li><a href="#contacto" onClick={() => handleWhatsAppClick()}>Contacto</a></li>
           </ul>
+          <div className="admin-section">
+            {user ? (
+              <div className="admin-info">
+                <span className="admin-welcome">👑 {user.username}</span>
+                <button className="logout-button" onClick={handleLogout}>
+                  Cerrar Sesión
+                </button>
+              </div>
+            ) : (
+              <button 
+                className="admin-login-button" 
+                onClick={() => setShowLoginModal(true)}
+              >
+                Admin Login
+              </button>
+            )}
+          </div>
         </nav>
       </header>
 
