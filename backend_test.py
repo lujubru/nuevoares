@@ -12,6 +12,15 @@ from typing import Dict, Any
 
 class AresClubAPITester:
     def __init__(self, base_url="http://localhost:8001"):
+        # Use the public URL from frontend .env if available
+        try:
+            with open('/app/frontend/.env', 'r') as f:
+                for line in f:
+                    if line.startswith('REACT_APP_BACKEND_URL='):
+                        base_url = line.split('=', 1)[1].strip()
+                        break
+        except:
+            pass
         self.base_url = base_url.rstrip('/')
         self.tests_run = 0
         self.tests_passed = 0
