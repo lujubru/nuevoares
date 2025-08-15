@@ -38,6 +38,7 @@ const ChatWidget = ({ user }) => {
       });
       if (response.data.success) {
         setChatRooms(response.data.data);
+        console.log('Chat rooms cargadas:', response.data.data.length);
       }
     } catch (error) {
       console.error('Error cargando salas de chat:', error);
@@ -60,6 +61,8 @@ const ChatWidget = ({ user }) => {
     });
 
     newSocket.on('new_message', (message) => {
+      console.log('Nuevo mensaje recibido:', message);
+      // Solo mostrar si es la sala activa o si no hay sala activa seleccionada
       if (!activeRoom || message.room_id === activeRoom) {
         setMessages(prev => [...prev, message]);
       }
@@ -67,10 +70,11 @@ const ChatWidget = ({ user }) => {
 
     newSocket.on('room_joined', (data) => {
       setRoomId(data.room_id);
-      console.log(data.message);
+      console.log('Unido a sala:', data.room_id);
     });
 
-    newSocket.on('new_user_message', () => {
+    newSocket.on('new_user_message', (notification) => {
+      console.log('Nueva notificación de usuario:', notification);
       if (user && user.is_admin) {
         loadChatRooms();
       }
@@ -89,8 +93,9 @@ const ChatWidget = ({ user }) => {
   // Unirse a la sala de admins si aplica
   useEffect(() => {
     if (socket && isConnected && user && user.is_admin) {
-      socket.emit('join_room', { room: 'admins' });
+      socket.emit('join_admins', {});
       loadChatRooms();
+      console.log('Admin conectado - cargando salas');
     }
   }, [socket, isConnected, user, loadChatRooms]);
 
@@ -98,6 +103,7 @@ const ChatWidget = ({ user }) => {
   useEffect(() => {
     if (socket && isConnected && username && !user) {
       socket.emit('join_room', { username });
+      console.log('Usuario regular conectándose con username:', username);
     }
   }, [socket, isConnected, username, user]);
 
@@ -143,6 +149,7 @@ const ChatWidget = ({ user }) => {
         return;
       }
       if (socket && isConnected) {
+        console.log('Enviando mensaje del usuario:', { username, message: newMessage, room_id: roomId });
         socket.emit('user_message', {
           username,
           message: newMessage,
@@ -158,11 +165,16 @@ const ChatWidget = ({ user }) => {
     setMessages([]);
     if (socket && user && user.is_admin) {
       socket.emit('admin_join_room', { room_id: room.room_id });
+      console.log('Admin seleccionó sala:', room.room_id);
     }
   };
 
   const toggleChat = () => {
     setIsOpen(!isOpen);
+    if (!isOpen && user && user.is_admin) {
+      // Recargar salas cuando el admin abre el chat
+      loadChatRooms();
+    }
   };
 
   return (
@@ -198,9 +210,14 @@ const ChatWidget = ({ user }) => {
             <div className="admin-chat-container">
               {!activeRoom ? (
                 <div className="chat-rooms-list">
-                  <h4>Conversaciones Activas</h4>
+                  <h4>Conversaciones Activas ({chatRooms.length})</h4>
                   {chatRooms.length === 0 ? (
-                    <div className="no-rooms"><p>No hay conversaciones activas</p></div>
+                    <div className="no-rooms">
+                      <p>No hay conversaciones activas</p>
+                      <p style={{fontSize: '0.8rem', color: '#888', marginTop: '1rem'}}>
+                        Las conversaciones aparecerán aquí cuando los usuarios escriban mensajes
+                      </p>
+                    </div>
                   ) : (
                     chatRooms.map((room) => (
                       <div key={room.room_id} className="room-item" onClick={() => selectRoom(room)}>
@@ -217,6 +234,21 @@ const ChatWidget = ({ user }) => {
                       </div>
                     ))
                   )}
+                  <button 
+                    onClick={loadChatRooms}
+                    style={{
+                      background: 'rgba(204, 0, 0, 0.2)',
+                      border: '1px solid rgba(204, 0, 0, 0.5)',
+                      color: 'white',
+                      padding: '0.5rem 1rem',
+                      borderRadius: '5px',
+                      cursor: 'pointer',
+                      marginTop: '1rem',
+                      width: '100%'
+                    }}
+                  >
+                    🔄 Actualizar conversaciones
+                  </button>
                 </div>
               ) : (
                 <div className="chat-conversation">
@@ -227,6 +259,7 @@ const ChatWidget = ({ user }) => {
                     {messages.length === 0 ? (
                       <div className="welcome-message">
                         <p>Conversación con {chatRooms.find(r => r.room_id === activeRoom)?.username}</p>
+                        <p style={{fontSize: '0.8rem', color: '#888'}}>Los mensajes aparecerán aquí</p>
                       </div>
                     ) : (
                       messages.map((message) => (
@@ -255,6 +288,9 @@ const ChatWidget = ({ user }) => {
                 <div className="welcome-message">
                   <p>¡Bienvenido al chat de soporte de Ares Club!</p>
                   <p>Nuestro equipo está aquí para ayudarte.</p>
+                  <p style={{fontSize: '0.8rem', color: '#888', marginTop: '1rem'}}>
+                    Conexión: {isConnected ? '🟢 Conectado' : '🔴 Desconectado'}
+                  </p>
                 </div>
               ) : (
                 messages.map((message) => (
