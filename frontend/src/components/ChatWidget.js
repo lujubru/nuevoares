@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import io from 'socket.io-client';
 import axios from 'axios';
 import './ChatWidget.css';
@@ -42,19 +42,7 @@ const ChatWidget = ({ user }) => {
     };
   }, [backendUrl]);
 
-  useEffect(() => {
-    // Cargar mensajes existentes cuando se abre el chat
-    if (isOpen && messages.length === 0) {
-      loadMessages();
-    }
-  }, [isOpen]);
-
-  useEffect(() => {
-    // Scroll automático al final
-    scrollToBottom();
-  }, [messages]);
-
-  const loadMessages = async () => {
+  const loadMessages = useCallback(async () => {
     try {
       const response = await axios.get(`${backendUrl}/api/chat/messages`);
       if (response.data.success) {
@@ -63,7 +51,19 @@ const ChatWidget = ({ user }) => {
     } catch (error) {
       console.error('Error cargando mensajes:', error);
     }
-  };
+  }, [backendUrl]);
+
+  useEffect(() => {
+    // Cargar mensajes existentes cuando se abre el chat
+    if (isOpen && messages.length === 0) {
+      loadMessages();
+    }
+  }, [isOpen, messages.length, loadMessages]);
+
+  useEffect(() => {
+    // Scroll automático al final
+    scrollToBottom();
+  }, [messages]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -71,7 +71,7 @@ const ChatWidget = ({ user }) => {
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    
+
     if (!newMessage.trim()) return;
 
     if (user && user.is_admin) {
@@ -123,7 +123,6 @@ const ChatWidget = ({ user }) => {
           <div className="chat-notification">
             <span>Chat de Soporte</span>
             {isConnected && <div className="online-indicator"></div>}
-            }
           </div>
         )}
       </div>
