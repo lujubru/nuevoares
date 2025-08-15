@@ -23,6 +23,8 @@ function App() {
   const [faq, setFaq] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [user, setUser] = useState(null);
+  const [showLoginModal, setShowLoginModal] = useState(false);
   
   const { trackEvent } = useMetaPixel();
   
