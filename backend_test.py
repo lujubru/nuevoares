@@ -461,6 +461,7 @@ class AresClubAPITester:
             print("   ✅ Admin message sent successfully")
         
         return success
+    def test_invalid_endpoints(self):
         """Test error handling for invalid endpoints"""
         # Test non-existent game
         success, response = self.run_test(
@@ -483,6 +484,33 @@ class AresClubAPITester:
         
         if success2:
             print("   ✅ Proper 404 handling for non-existent promotion")
+        
+        # Test invalid chat room status update
+        login_data = {"username": "admin", "password": "admin123"}
+        success_login, login_response = self.run_test(
+            "Admin Login for Error Tests",
+            "POST",
+            "/api/auth/login",
+            200,
+            data=login_data
+        )
+        
+        if success_login and "access_token" in login_response:
+            token = login_response["access_token"]
+            headers = {"Authorization": f"Bearer {token}"}
+            
+            # Test invalid status value
+            success3, response3 = self.run_test(
+                "Invalid Chat Status Update",
+                "PUT",
+                "/api/chat/rooms/test_room/status",
+                400,
+                data={"status": "invalid_status"},
+                headers=headers
+            )
+            
+            if success3:
+                print("   ✅ Proper 400 handling for invalid chat status")
         
         return success and success2
 
