@@ -12,8 +12,9 @@ from typing import Optional
 import jwt
 from datetime import timedelta
 import socketio
+import hashlib
 
-from database import get_db, create_tables, check_db_connection, Contact, GameInteraction, PromoInteraction, User, ChatMessage, authenticate_user, SessionLocal, SessionLocal
+from database import get_db, create_tables, check_db_connection, Contact, GameInteraction, PromoInteraction, User, ChatMessage, ChatRoom, authenticate_user, SessionLocal
 
 # Cargar variables de entorno
 load_dotenv()
@@ -445,10 +446,13 @@ async def get_current_user_info(current_user: User = Depends(get_current_user)):
     }
 
 # Endpoints de chat
-@app.get("/api/chat/messages")
-async def get_chat_messages(db: Session = Depends(get_db)):
-    """Obtener mensajes del chat"""
-    messages = db.query(ChatMessage).order_by(desc(ChatMessage.created_at)).limit(50).all()
+@app.get("/api/chat/messages/{room_id}")
+async def get_chat_messages(room_id: str, db: Session = Depends(get_db)):
+    """Obtener mensajes de una conversación específica"""
+    messages = db.query(ChatMessage).filter(
+        ChatMessage.room_id == room_id
+    ).order_by(desc(ChatMessage.created_at)).limit(50).all()
+    
     return {
         "success": True,
         "data": [
@@ -457,10 +461,48 @@ async def get_chat_messages(db: Session = Depends(get_db)):
                 "username": msg.username,
                 "message": msg.message,
                 "is_admin": msg.is_admin,
+                "room_id": msg.room_id,
                 "created_at": msg.created_at.isoformat()
             }
             for msg in reversed(messages)
         ]
+    }
+
+@app.get("/api/chat/rooms")
+async def get_chat_rooms(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Obtener todas las salas de chat (solo para admins)"""
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Only admins can view chat rooms")
+    
+    rooms = db.query(ChatRoom).filter(
+        ChatRoom.is_active == True
+    ).order_by(desc(ChatRoom.last_message_at)).all()
+    
+    # Obtener el último mensaje de cada sala
+    rooms_data = []
+    for room in rooms:
+        last_message = db.query(ChatMessage).filter(
+            ChatMessage.room_id == room.room_id
+        ).order_by(desc(ChatMessage.created_at)).first()
+        
+        unread_count = db.query(ChatMessage).filter(
+            ChatMessage.room_id == room.room_id,
+            ChatMessage.is_admin == False,
+            ChatMessage.created_at > room.last_message_at
+        ).count()
+        
+        rooms_data.append({
+            "room_id": room.room_id,
+            "username": room.username,
+            "last_message": last_message.message if last_message else "Sin mensajes",
+            "last_message_time": last_message.created_at.isoformat() if last_message else room.created_at.isoformat(),
+            "unread_count": unread_count,
+            "is_active": room.is_active
+        })
+    
+    return {
+        "success": True,
+        "data": rooms_data
     }
 
 @app.post("/api/chat/send")
@@ -474,48 +516,108 @@ async def send_chat_message(
         raise HTTPException(status_code=403, detail="Only admins can send messages")
     
     message_text = message_data.get("message")
+    room_id = message_data.get("room_id")
+    
     if not message_text:
         raise HTTPException(status_code=400, detail="Message is required")
+    
+    if not room_id:
+        raise HTTPException(status_code=400, detail="Room ID is required")
     
     chat_message = ChatMessage(
         user_id=current_user.id,
         username=current_user.username,
         message=message_text,
+        room_id=room_id,
         is_admin=True
     )
     
     db.add(chat_message)
+    
+    # Actualizar la sala
+    room = db.query(ChatRoom).filter(ChatRoom.room_id == room_id).first()
+    if room:
+        room.last_message_at = datetime.utcnow()
+    
     db.commit()
     
-    # Emitir mensaje a todos los clientes conectados
+    # Emitir mensaje solo a la sala específica
     await sio.emit('new_message', {
         'id': chat_message.id,
         'username': chat_message.username,
         'message': chat_message.message,
+        'room_id': room_id,
         'is_admin': True,
         'created_at': chat_message.created_at.isoformat()
-    })
+    }, room=room_id)
     
     return {"success": True, "message": "Message sent"}
+
+def generate_room_id(username):
+    """Generar un ID único para la sala de chat basado en el username"""
+    return hashlib.md5(f"chat_{username}_{datetime.now().date()}".encode()).hexdigest()[:16]
 
 # Socket.IO events
 @sio.event
 async def connect(sid, environ):
     print(f"Cliente conectado: {sid}")
-    await sio.emit('connected', {'message': 'Conectado al chat de Ares Club'}, room=sid)
 
 @sio.event
 async def disconnect(sid):
     print(f"Cliente desconectado: {sid}")
 
 @sio.event
+async def join_room(sid, data):
+    """Usuario se une a su sala de chat"""
+    username = data.get('username')
+    if not username:
+        return
+    
+    room_id = generate_room_id(username)
+    await sio.enter_room(sid, room_id)
+    
+    # Crear o actualizar la sala en la base de datos
+    db = SessionLocal()
+    try:
+        room = db.query(ChatRoom).filter(ChatRoom.room_id == room_id).first()
+        if not room:
+            room = ChatRoom(
+                room_id=room_id,
+                username=username,
+                is_active=True
+            )
+            db.add(room)
+            db.commit()
+    except Exception as e:
+        print(f"Error creando sala: {e}")
+    finally:
+        db.close()
+    
+    await sio.emit('room_joined', {
+        'room_id': room_id,
+        'message': f'Conectado al chat de Ares Club'
+    }, room=sid)
+
+@sio.event
+async def admin_join_room(sid, data):
+    """Admin se une a una sala específica"""
+    room_id = data.get('room_id')
+    if room_id:
+        await sio.enter_room(sid, room_id)
+        await sio.emit('admin_joined', {'room_id': room_id}, room=sid)
+
+@sio.event
 async def user_message(sid, data):
     """Manejar mensajes de usuarios"""
     username = data.get('username', 'Usuario Anónimo')
     message = data.get('message', '')
+    room_id = data.get('room_id')
     
     if not message.strip():
         return
+    
+    if not room_id:
+        room_id = generate_room_id(username)
     
     # Guardar mensaje en la base de datos
     db = SessionLocal()
@@ -523,19 +625,35 @@ async def user_message(sid, data):
         chat_message = ChatMessage(
             username=username,
             message=message,
+            room_id=room_id,
             is_admin=False
         )
         db.add(chat_message)
+        
+        # Actualizar la sala
+        room = db.query(ChatRoom).filter(ChatRoom.room_id == room_id).first()
+        if room:
+            room.last_message_at = datetime.utcnow()
+        
         db.commit()
         
-        # Emitir mensaje a todos los clientes
+        # Emitir mensaje solo a la sala específica
         await sio.emit('new_message', {
             'id': chat_message.id,
             'username': username,
             'message': message,
+            'room_id': room_id,
             'is_admin': False,
             'created_at': chat_message.created_at.isoformat()
-        })
+        }, room=room_id)
+        
+        # Notificar a los admins sobre nuevo mensaje
+        await sio.emit('new_user_message', {
+            'room_id': room_id,
+            'username': username,
+            'message': message,
+            'created_at': chat_message.created_at.isoformat()
+        }, room='admins')
         
     except Exception as e:
         print(f"Error guardando mensaje: {e}")

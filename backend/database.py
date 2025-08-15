@@ -69,8 +69,19 @@ class ChatMessage(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, nullable=True)  # None para usuarios anónimos
     username = Column(String(50), nullable=False)
+    room_id = Column(String(100), nullable=False)  # ID único para cada conversación
     message = Column(Text, nullable=False)
     is_admin = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class ChatRoom(Base):
+    __tablename__ = "chat_rooms"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    room_id = Column(String(100), unique=True, nullable=False)
+    username = Column(String(50), nullable=False)
+    last_message_at = Column(DateTime(timezone=True), server_default=func.now())
+    is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 # Función para obtener la sesión de base de datos
