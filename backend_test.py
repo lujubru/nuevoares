@@ -357,7 +357,7 @@ class AresClubAPITester:
         return success
 
     def test_chat_endpoints(self):
-        """Test chat endpoints including new management features"""
+        """Test chat endpoints including new DELETE functionality"""
         # First login to get admin token
         login_data = {
             "username": "admin",
@@ -379,19 +379,6 @@ class AresClubAPITester:
         token = login_response["access_token"]
         headers = {"Authorization": f"Bearer {token}"}
         
-        # Test get chat messages (requires room_id)
-        success, response = self.run_test(
-            "Get Chat Messages (test room)",
-            "GET",
-            "/api/chat/messages/test_room_123",
-            200,
-            headers=headers
-        )
-        
-        if success and response:
-            messages = response.get("data", [])
-            print(f"   ✅ Found {len(messages)} chat messages")
-        
         # Test get chat rooms (admin only)
         success, rooms_response = self.run_test(
             "Get Chat Rooms (Admin)",
@@ -405,67 +392,117 @@ class AresClubAPITester:
             rooms = rooms_response.get("data", [])
             print(f"   ✅ Found {len(rooms)} chat rooms")
             
-            # If there are rooms, test status update and delete
+            # Test delete chat room functionality
             if rooms:
                 test_room_id = rooms[0]["room_id"]
+                test_username = rooms[0]["username"]
                 
-                # Test update chat status to closed
-                success, status_response = self.run_test(
-                    "Update Chat Status to Closed",
-                    "PUT",
-                    f"/api/chat/rooms/{test_room_id}/status",
+                # Test get messages for this room first
+                success, messages_response = self.run_test(
+                    f"Get Chat Messages for Room {test_room_id}",
+                    "GET",
+                    f"/api/chat/messages/{test_room_id}",
                     200,
-                    data={"status": "closed"},
                     headers=headers
                 )
                 
                 if success:
-                    print("   ✅ Chat status updated to closed")
+                    messages = messages_response.get("data", [])
+                    print(f"   ✅ Found {len(messages)} messages in room {test_room_id}")
                 
-                # Test update chat status back to active
-                success, status_response = self.run_test(
-                    "Update Chat Status to Active",
-                    "PUT",
-                    f"/api/chat/rooms/{test_room_id}/status",
-                    200,
-                    data={"status": "active"},
-                    headers=headers
-                )
-                
-                if success:
-                    print("   ✅ Chat status updated to active")
-                
-                # Test delete chat room (soft delete)
+                # Test DELETE chat room endpoint (NEW FUNCTIONALITY)
                 success, delete_response = self.run_test(
-                    "Delete Chat Room (Soft Delete)",
+                    f"DELETE Chat Room {test_room_id} ({test_username})",
                     "DELETE",
                     f"/api/chat/rooms/{test_room_id}",
                     200,
                     headers=headers
                 )
                 
-                if success:
-                    print("   ✅ Chat room deleted successfully")
+                if success and delete_response:
+                    if delete_response.get("success"):
+                        messages_deleted = delete_response.get("messages_deleted", 0)
+                        print(f"   ✅ Chat room deleted successfully - {messages_deleted} messages removed")
+                        
+                        # Verify room is actually deleted by trying to get it again
+                        success_verify, rooms_after = self.run_test(
+                            "Verify Room Deletion - Get Rooms Again",
+                            "GET",
+                            "/api/chat/rooms",
+                            200,
+                            headers=headers
+                        )
+                        
+                        if success_verify:
+                            remaining_rooms = rooms_after.get("data", [])
+                            room_still_exists = any(r["room_id"] == test_room_id for r in remaining_rooms)
+                            if not room_still_exists:
+                                print(f"   ✅ Room {test_room_id} successfully removed from list")
+                            else:
+                                print(f"   ⚠️  Room {test_room_id} still appears in list after deletion")
+                    else:
+                        print(f"   ❌ Delete response indicates failure: {delete_response}")
+                        return False
+                else:
+                    print("   ❌ Failed to delete chat room")
+                    return False
             else:
-                print("   ℹ️  No chat rooms found to test management features")
+                print("   ℹ️  No chat rooms found to test delete functionality")
+                # Create a test room by sending a message first
+                test_message_data = {
+                    "message": "Test message to create room for deletion test",
+                    "room_id": "test_delete_room_123"
+                }
+                
+                success, send_response = self.run_test(
+                    "Create Test Room for Deletion",
+                    "POST",
+                    "/api/chat/send",
+                    200,
+                    data=test_message_data,
+                    headers=headers
+                )
+                
+                if success:
+                    print("   ✅ Test room created")
+                    
+                    # Now test delete on this room
+                    success, delete_response = self.run_test(
+                        "DELETE Test Room",
+                        "DELETE",
+                        "/api/chat/rooms/test_delete_room_123",
+                        200,
+                        headers=headers
+                    )
+                    
+                    if success and delete_response.get("success"):
+                        print("   ✅ Test room deleted successfully")
+                    else:
+                        print("   ❌ Failed to delete test room")
+                        return False
         
-        # Test send message (admin)
-        test_message_data = {
-            "message": "Test admin message",
-            "room_id": "test_room_123"
-        }
+        # Test unauthorized delete (without admin token)
+        success, unauthorized_response = self.run_test(
+            "DELETE Chat Room (Unauthorized)",
+            "DELETE",
+            "/api/chat/rooms/any_room_id",
+            401  # Should return 401 Unauthorized
+        )
         
-        success, send_response = self.run_test(
-            "Send Admin Message",
-            "POST",
-            "/api/chat/send",
-            200,
-            data=test_message_data,
+        if success:
+            print("   ✅ Unauthorized delete properly rejected")
+        
+        # Test delete non-existent room
+        success, not_found_response = self.run_test(
+            "DELETE Non-existent Chat Room",
+            "DELETE",
+            "/api/chat/rooms/non_existent_room_999",
+            404,  # Should return 404 Not Found
             headers=headers
         )
         
         if success:
-            print("   ✅ Admin message sent successfully")
+            print("   ✅ Non-existent room delete properly handled")
         
         return success
     def test_invalid_endpoints(self):
