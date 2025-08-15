@@ -81,6 +81,60 @@
   transform: translateY(-2px);
 }
 
+/* Admin Section */
+.admin-section {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.admin-login-button {
+  background: linear-gradient(45deg, #cc0000, #ff0000);
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 0.9rem;
+}
+
+.admin-login-button:hover {
+  background: linear-gradient(45deg, #ff0000, #cc0000);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(204, 0, 0, 0.3);
+}
+
+.admin-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  color: white;
+}
+
+.admin-welcome {
+  font-weight: bold;
+  color: #ffd700;
+  font-size: 0.9rem;
+}
+
+.logout-button {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 0.3rem 0.8rem;
+  border-radius: 15px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.logout-button:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
 /* Hero Section */
 .hero {
   position: relative;
