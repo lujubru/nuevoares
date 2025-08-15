@@ -39,9 +39,11 @@ const ChatWidget = ({ user }) => {
       if (response.data.success) {
         setChatRooms(response.data.data);
         console.log('Chat rooms cargadas:', response.data.data.length);
+        console.log('Salas encontradas:', response.data.data);
       }
     } catch (error) {
       console.error('Error cargando salas de chat:', error);
+      console.error('Error details:', error.response?.data);
     }
   }, [backendUrl, user]);
 
@@ -76,7 +78,13 @@ const ChatWidget = ({ user }) => {
     newSocket.on('new_user_message', (notification) => {
       console.log('Nueva notificación de usuario:', notification);
       if (user && user.is_admin) {
+        // Recargar salas inmediatamente cuando llega un nuevo mensaje
         loadChatRooms();
+        
+        // Mostrar notificación visual si no está en esa sala
+        if (!activeRoom || activeRoom !== notification.room_id) {
+          console.log(`Nuevo mensaje de ${notification.username} en sala ${notification.room_id}`);
+        }
       }
     });
 
@@ -94,7 +102,10 @@ const ChatWidget = ({ user }) => {
   useEffect(() => {
     if (socket && isConnected && user && user.is_admin) {
       socket.emit('join_admins', {});
-      loadChatRooms();
+      // Cargar salas con un pequeño delay para asegurar conexión
+      setTimeout(() => {
+        loadChatRooms();
+      }, 1000);
       console.log('Admin conectado - cargando salas');
     }
   }, [socket, isConnected, user, loadChatRooms]);
@@ -172,8 +183,10 @@ const ChatWidget = ({ user }) => {
   const toggleChat = () => {
     setIsOpen(!isOpen);
     if (!isOpen && user && user.is_admin) {
-      // Recargar salas cuando el admin abre el chat
-      loadChatRooms();
+      // Recargar salas cuando el admin abre el chat con delay
+      setTimeout(() => {
+        loadChatRooms();
+      }, 500);
     }
   };
 
@@ -249,6 +262,14 @@ const ChatWidget = ({ user }) => {
                   >
                     🔄 Actualizar conversaciones
                   </button>
+                  <div style={{
+                    fontSize: '0.7rem',
+                    color: '#888',
+                    textAlign: 'center',
+                    marginTop: '0.5rem'
+                  }}>
+                    Última actualización: {new Date().toLocaleTimeString()}
+                  </div>
                 </div>
               ) : (
                 <div className="chat-conversation">

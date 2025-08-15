@@ -141,3 +141,9 @@ def authenticate_user(db: Session, username: str, password: str):
     if not verify_password(password, user.hashed_password):
         return False
     return user
+
+def generate_room_id(username):
+    """Generar un ID único para la sala de chat basado en el username"""
+    # Usar un hash más consistente para evitar duplicados
+    import hashlib
+    return hashlib.md5(f"chat_room_{username.lower()}".encode()).hexdigest()[:16]

@@ -484,7 +484,7 @@ async def get_chat_rooms(db: Session = Depends(get_db), current_user: User = Dep
             ChatMessage.room_id == room.room_id
         ).order_by(desc(ChatMessage.created_at)).first()
         
-        # Corregir el cálculo de mensajes no leídos
+        # Contar mensajes de usuarios (no admin) como no leídos
         unread_count = db.query(ChatMessage).filter(
             ChatMessage.room_id == room.room_id,
             ChatMessage.is_admin == False
@@ -647,10 +647,20 @@ async def user_message(sid, data):
         )
         db.add(chat_message)
         
-        # Actualizar la sala
+        # Actualizar o crear la sala
         room = db.query(ChatRoom).filter(ChatRoom.room_id == room_id).first()
-        if room:
+        if not room:
+            # Crear nueva sala si no existe
+            room = ChatRoom(
+                room_id=room_id,
+                username=username,
+                is_active=True
+            )
+            db.add(room)
+        else:
+            # Actualizar sala existente
             room.last_message_at = datetime.utcnow()
+            room.is_active = True
         
         db.commit()
         print(f"Mensaje guardado en BD: {chat_message.id}")
@@ -673,6 +683,7 @@ async def user_message(sid, data):
             'room_id': room_id,
             'username': username,
             'message': message,
+            'unread_count': 1,
             'created_at': chat_message.created_at.isoformat()
         }
         
@@ -681,6 +692,7 @@ async def user_message(sid, data):
         
     except Exception as e:
         print(f"Error guardando mensaje: {e}")
+        db.rollback()
     finally:
         db.close()
 
