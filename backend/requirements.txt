@@ -8,5 +8,6 @@ alembic==1.13.1
 passlib[bcrypt]==1.7.4
 python-jose[cryptography]==3.3.0
 python-socketio==5.10.0
+python-engineio==4.12.2
 eventlet==0.33.3
 PyJWT==2.8.0
