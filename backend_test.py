@@ -350,19 +350,115 @@ class AresClubAPITester:
         return success
 
     def test_chat_endpoints(self):
-        """Test chat endpoints"""
-        # Test get chat messages (public endpoint)
+        """Test chat endpoints including new management features"""
+        # First login to get admin token
+        login_data = {
+            "username": "admin",
+            "password": "admin123"
+        }
+        
+        success, login_response = self.run_test(
+            "Admin Login for Chat Tests",
+            "POST",
+            "/api/auth/login",
+            200,
+            data=login_data
+        )
+        
+        if not success or "access_token" not in login_response:
+            print("   ❌ Cannot test chat endpoints without admin token")
+            return False
+            
+        token = login_response["access_token"]
+        headers = {"Authorization": f"Bearer {token}"}
+        
+        # Test get chat messages (requires room_id)
         success, response = self.run_test(
-            "Get Chat Messages",
+            "Get Chat Messages (test room)",
             "GET",
-            "/api/chat/messages",
-            200
+            "/api/chat/messages/test_room_123",
+            200,
+            headers=headers
         )
         
         if success and response:
             messages = response.get("data", [])
             print(f"   ✅ Found {len(messages)} chat messages")
-            return True
+        
+        # Test get chat rooms (admin only)
+        success, rooms_response = self.run_test(
+            "Get Chat Rooms (Admin)",
+            "GET",
+            "/api/chat/rooms",
+            200,
+            headers=headers
+        )
+        
+        if success and rooms_response:
+            rooms = rooms_response.get("data", [])
+            print(f"   ✅ Found {len(rooms)} chat rooms")
+            
+            # If there are rooms, test status update and delete
+            if rooms:
+                test_room_id = rooms[0]["room_id"]
+                
+                # Test update chat status to closed
+                success, status_response = self.run_test(
+                    "Update Chat Status to Closed",
+                    "PUT",
+                    f"/api/chat/rooms/{test_room_id}/status",
+                    200,
+                    data={"status": "closed"},
+                    headers=headers
+                )
+                
+                if success:
+                    print("   ✅ Chat status updated to closed")
+                
+                # Test update chat status back to active
+                success, status_response = self.run_test(
+                    "Update Chat Status to Active",
+                    "PUT",
+                    f"/api/chat/rooms/{test_room_id}/status",
+                    200,
+                    data={"status": "active"},
+                    headers=headers
+                )
+                
+                if success:
+                    print("   ✅ Chat status updated to active")
+                
+                # Test delete chat room (soft delete)
+                success, delete_response = self.run_test(
+                    "Delete Chat Room (Soft Delete)",
+                    "DELETE",
+                    f"/api/chat/rooms/{test_room_id}",
+                    200,
+                    headers=headers
+                )
+                
+                if success:
+                    print("   ✅ Chat room deleted successfully")
+            else:
+                print("   ℹ️  No chat rooms found to test management features")
+        
+        # Test send message (admin)
+        test_message_data = {
+            "message": "Test admin message",
+            "room_id": "test_room_123"
+        }
+        
+        success, send_response = self.run_test(
+            "Send Admin Message",
+            "POST",
+            "/api/chat/send",
+            200,
+            data=test_message_data,
+            headers=headers
+        )
+        
+        if success:
+            print("   ✅ Admin message sent successfully")
         
         return success
         """Test error handling for invalid endpoints"""
