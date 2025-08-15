@@ -652,13 +652,18 @@ async def join_room(sid, data):
             room = ChatRoom(
                 room_id=room_id,
                 username=username,
-                is_active=True
+                is_active=True,
+                status="active"
             )
             db.add(room)
         else:
-            # Actualizar última actividad
-            room.last_message_at = datetime.utcnow()
-            room.is_active = True
+            # Actualizar última actividad si no está eliminada
+            if room.status != "deleted":
+                room.last_message_at = datetime.utcnow()
+                if room.status == "closed":
+                    # Reactivar automáticamente si el usuario escribe
+                    room.status = "active"
+                room.is_active = True
         
         db.commit()
         print(f"Sala de chat creada/actualizada para {username}")
