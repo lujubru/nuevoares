@@ -288,10 +288,41 @@ const ChatWidget = ({ user }) => {
                     chatRooms.map((room) => (
                       <div key={room.room_id} className="room-item" onClick={() => selectRoom(room)}>
                         <div className="room-header">
-                          <span className="room-username">👤 {room.username}</span>
-                          {room.unread_count > 0 && (
-                            <span className="unread-badge">{room.unread_count}</span>
-                          )}
+                          <div className="room-info">
+                            <span className="room-username" style={{ color: getStatusColor(room.status) }}>
+                              {getStatusIcon(room.status)} {room.username}
+                            </span>
+                            {room.status === 'closed' && <span className="status-badge closed">CERRADO</span>}
+                            {room.unread_count > 0 && room.status !== 'closed' && (
+                              <span className="unread-badge">{room.unread_count}</span>
+                            )}
+                          </div>
+                          <div className="room-actions" onClick={(e) => e.stopPropagation()}>
+                            {room.status === 'active' ? (
+                              <button 
+                                className="action-button close-button"
+                                onClick={() => updateChatStatus(room.room_id, 'closed')}
+                                title="Cerrar chat"
+                              >
+                                🔒
+                              </button>
+                            ) : (
+                              <button 
+                                className="action-button reopen-button"
+                                onClick={() => updateChatStatus(room.room_id, 'active')}
+                                title="Reabrir chat"
+                              >
+                                🔓
+                              </button>
+                            )}
+                            <button 
+                              className="action-button delete-button"
+                              onClick={() => setShowDeleteConfirm(room.room_id)}
+                              title="Eliminar chat"
+                            >
+                              🗑️
+                            </button>
+                          </div>
                         </div>
                         <div className="room-last-message">{room.last_message}</div>
                         <div className="room-time">
