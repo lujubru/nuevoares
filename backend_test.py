@@ -285,7 +285,86 @@ class AresClubAPITester:
         
         return success
 
-    def test_invalid_endpoints(self):
+    def test_auth_endpoints(self):
+        """Test authentication endpoints"""
+        # Test login with correct credentials
+        login_data = {
+            "username": "admin",
+            "password": "admin123"
+        }
+        
+        success, response = self.run_test(
+            "Admin Login",
+            "POST",
+            "/api/auth/login",
+            200,
+            data=login_data
+        )
+        
+        if not success:
+            return False
+            
+        if "access_token" not in response:
+            print("   ⚠️  No access token in login response")
+            return False
+            
+        token = response["access_token"]
+        user_data = response.get("user", {})
+        
+        if not user_data.get("is_admin"):
+            print("   ⚠️  User is not admin")
+            return False
+            
+        print(f"   ✅ Admin login successful, user: {user_data.get('username')}")
+        
+        # Test protected endpoint with token
+        headers = {"Authorization": f"Bearer {token}"}
+        success, me_response = self.run_test(
+            "Get Current User",
+            "GET",
+            "/api/auth/me",
+            200,
+            headers=headers
+        )
+        
+        if success and me_response:
+            print(f"   ✅ Protected endpoint accessible, user: {me_response.get('username')}")
+        
+        # Test invalid credentials
+        invalid_login = {
+            "username": "admin",
+            "password": "wrongpassword"
+        }
+        
+        success, _ = self.run_test(
+            "Invalid Login",
+            "POST",
+            "/api/auth/login",
+            401,
+            data=invalid_login
+        )
+        
+        if success:
+            print("   ✅ Invalid credentials properly rejected")
+        
+        return success
+
+    def test_chat_endpoints(self):
+        """Test chat endpoints"""
+        # Test get chat messages (public endpoint)
+        success, response = self.run_test(
+            "Get Chat Messages",
+            "GET",
+            "/api/chat/messages",
+            200
+        )
+        
+        if success and response:
+            messages = response.get("data", [])
+            print(f"   ✅ Found {len(messages)} chat messages")
+            return True
+        
+        return success
         """Test error handling for invalid endpoints"""
         # Test non-existent game
         success, response = self.run_test(
