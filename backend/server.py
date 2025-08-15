@@ -53,7 +53,6 @@ app.add_middleware(
 if os.path.isdir("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
-
 # Crear tablas al iniciar
 @app.on_event("startup")
 async def startup_event():
@@ -485,10 +484,10 @@ async def get_chat_rooms(db: Session = Depends(get_db), current_user: User = Dep
             ChatMessage.room_id == room.room_id
         ).order_by(desc(ChatMessage.created_at)).first()
         
+        # Corregir el cálculo de mensajes no leídos
         unread_count = db.query(ChatMessage).filter(
             ChatMessage.room_id == room.room_id,
-            ChatMessage.is_admin == False,
-            ChatMessage.created_at > room.last_message_at
+            ChatMessage.is_admin == False
         ).count()
         
         rooms_data.append({
@@ -555,7 +554,7 @@ async def send_chat_message(
 
 def generate_room_id(username):
     """Generar un ID único para la sala de chat basado en el username"""
-    return hashlib.md5(f"chat_{username}_{datetime.now().date()}".encode()).hexdigest()[:16]
+    return hashlib.md5(f"chat_{username}".encode()).hexdigest()[:16]
 
 # Socket.IO events
 @sio.event
@@ -575,6 +574,7 @@ async def join_room(sid, data):
     
     room_id = generate_room_id(username)
     await sio.enter_room(sid, room_id)
+    print(f"Usuario {username} se unió a la sala {room_id}")
     
     # Crear o actualizar la sala en la base de datos
     db = SessionLocal()
@@ -587,7 +587,13 @@ async def join_room(sid, data):
                 is_active=True
             )
             db.add(room)
-            db.commit()
+        else:
+            # Actualizar última actividad
+            room.last_message_at = datetime.utcnow()
+            room.is_active = True
+        
+        db.commit()
+        print(f"Sala de chat creada/actualizada para {username}")
     except Exception as e:
         print(f"Error creando sala: {e}")
     finally:
@@ -604,7 +610,16 @@ async def admin_join_room(sid, data):
     room_id = data.get('room_id')
     if room_id:
         await sio.enter_room(sid, room_id)
+        # También unir a la sala de admins
+        await sio.enter_room(sid, 'admins')
         await sio.emit('admin_joined', {'room_id': room_id}, room=sid)
+        print(f"Admin se unió a la sala {room_id}")
+
+@sio.event
+async def join_admins(sid, data):
+    """Admin se une al canal de notificaciones de admins"""
+    await sio.enter_room(sid, 'admins')
+    print(f"Admin {sid} se unió al canal de admins")
 
 @sio.event
 async def user_message(sid, data):
@@ -618,6 +633,8 @@ async def user_message(sid, data):
     
     if not room_id:
         room_id = generate_room_id(username)
+    
+    print(f"Mensaje recibido de {username} en sala {room_id}: {message}")
     
     # Guardar mensaje en la base de datos
     db = SessionLocal()
@@ -636,24 +653,31 @@ async def user_message(sid, data):
             room.last_message_at = datetime.utcnow()
         
         db.commit()
+        print(f"Mensaje guardado en BD: {chat_message.id}")
         
         # Emitir mensaje solo a la sala específica
-        await sio.emit('new_message', {
+        message_data = {
             'id': chat_message.id,
             'username': username,
             'message': message,
             'room_id': room_id,
             'is_admin': False,
             'created_at': chat_message.created_at.isoformat()
-        }, room=room_id)
+        }
+        
+        # Emitir a la sala del usuario
+        await sio.emit('new_message', message_data, room=room_id)
         
         # Notificar a los admins sobre nuevo mensaje
-        await sio.emit('new_user_message', {
+        admin_notification = {
             'room_id': room_id,
             'username': username,
             'message': message,
             'created_at': chat_message.created_at.isoformat()
-        }, room='admins')
+        }
+        
+        await sio.emit('new_user_message', admin_notification, room='admins')
+        print(f"Notificación enviada a admins para sala {room_id}")
         
     except Exception as e:
         print(f"Error guardando mensaje: {e}")
