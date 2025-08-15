@@ -407,6 +407,12 @@ class AresClubAPITester:
         self.test_contact_endpoint()
         self.test_stats_endpoint()
         
+        # Authentication tests
+        self.test_auth_endpoints()
+        
+        # Chat tests
+        self.test_chat_endpoints()
+        
         # Error handling tests
         self.test_invalid_endpoints()
         
