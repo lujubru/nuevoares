@@ -560,6 +560,66 @@ async def send_chat_message(
     
     return {"success": True, "message": "Message sent"}
 
+@app.put("/api/chat/rooms/{room_id}/status")
+async def update_chat_room_status(
+    room_id: str,
+    status_data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Cambiar el estado de una sala de chat (solo admins)"""
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Only admins can update chat status")
+    
+    new_status = status_data.get("status")
+    if new_status not in ["active", "closed"]:
+        raise HTTPException(status_code=400, detail="Invalid status. Must be 'active' or 'closed'")
+    
+    room = db.query(ChatRoom).filter(ChatRoom.room_id == room_id).first()
+    if not room:
+        raise HTTPException(status_code=404, detail="Chat room not found")
+    
+    if room.status == "deleted":
+        raise HTTPException(status_code=400, detail="Cannot update deleted chat room")
+    
+    room.status = new_status
+    db.commit()
+    
+    return {
+        "success": True,
+        "message": f"Chat room status updated to {new_status}",
+        "room_id": room_id,
+        "status": new_status
+    }
+
+@app.delete("/api/chat/rooms/{room_id}")
+async def delete_chat_room(
+    room_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Eliminar una sala de chat (soft delete - solo admins)"""
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Only admins can delete chat rooms")
+    
+    room = db.query(ChatRoom).filter(ChatRoom.room_id == room_id).first()
+    if not room:
+        raise HTTPException(status_code=404, detail="Chat room not found")
+    
+    if room.status == "deleted":
+        raise HTTPException(status_code=400, detail="Chat room already deleted")
+    
+    # Soft delete - marcar como eliminado
+    room.status = "deleted"
+    room.is_active = False
+    db.commit()
+    
+    return {
+        "success": True,
+        "message": "Chat room deleted successfully",
+        "room_id": room_id
+    }
+
 def generate_room_id(username):
     """Generar un ID único para la sala de chat basado en el username"""
     return hashlib.md5(f"chat_{username}".encode()).hexdigest()[:16]
