@@ -81,7 +81,8 @@ class ChatRoom(Base):
     room_id = Column(String(100), unique=True, nullable=False)
     username = Column(String(50), nullable=False)
     last_message_at = Column(DateTime(timezone=True), server_default=func.now())
-    is_active = Column(Boolean, default=True)
+    is_active = Column(Boolean, default=True)  # Mantener por compatibilidad
+    status = Column(String(20), default="active")  # active, closed, deleted
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 # Función para obtener la sesión de base de datos
