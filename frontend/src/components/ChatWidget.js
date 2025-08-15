@@ -393,6 +393,17 @@ const ChatWidget = ({ user }) => {
                 <div className="welcome-message">
                   <p>¡Bienvenido al chat de soporte de Ares Club!</p>
                   <p>Nuestro equipo está aquí para ayudarte.</p>
+                  {/* Mostrar mensaje si el chat está cerrado */}
+                  {activeRoom && chatRooms.find(r => r.room_id === activeRoom)?.status === 'closed' && (
+                    <div className="chat-closed-message">
+                      <p style={{color: '#FF9800', fontWeight: 'bold'}}>
+                        🔒 Este chat ha sido cerrado por un administrador
+                      </p>
+                      <p style={{fontSize: '0.8rem', color: '#888'}}>
+                        Puedes seguir escribiendo y se reabrirá automáticamente
+                      </p>
+                    </div>
+                  )}
                   <p style={{fontSize: '0.8rem', color: '#888', marginTop: '1rem'}}>
                     Conexión: {isConnected ? '🟢 Conectado' : '🔴 Desconectado'}
                   </p>
