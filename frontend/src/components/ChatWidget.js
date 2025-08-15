@@ -135,6 +135,58 @@ const ChatWidget = ({ user }) => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  const updateChatStatus = async (roomId, status) => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.put(
+        `${backendUrl}/api/chat/rooms/${roomId}/status`,
+        { status },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      // Recargar salas después de actualizar
+      loadChatRooms();
+    } catch (error) {
+      console.error('Error actualizando estado del chat:', error);
+      alert('Error al actualizar el estado del chat');
+    }
+  };
+
+  const deleteChatRoom = async (roomId) => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.delete(
+        `${backendUrl}/api/chat/rooms/${roomId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      // Recargar salas después de eliminar
+      loadChatRooms();
+      // Si era la sala activa, volver al listado
+      if (activeRoom === roomId) {
+        setActiveRoom(null);
+      }
+      setShowDeleteConfirm(null);
+    } catch (error) {
+      console.error('Error eliminando chat:', error);
+      alert('Error al eliminar el chat');
+    }
+  };
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'active': return '💬';
+      case 'closed': return '🔒';
+      default: return '💬';
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'active': return '#4CAF50';
+      case 'closed': return '#FF9800';
+      default: return '#4CAF50';
+    }
+  };
+
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!newMessage.trim()) return;
