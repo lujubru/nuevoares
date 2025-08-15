@@ -332,7 +332,7 @@ async def get_stats(db: Session = Depends(get_db)):
         total_promo_interactions = db.query(PromoInteraction).count()
         
         # Top juegos más clickeados
-        top_games = db.query(GameInteraction.game_name, db.func.count(GameInteraction.id).label('clicks'))\
+        top_games = db.query(GameInteraction.game_name, func.count(GameInteraction.id).label('clicks'))\
                      .group_by(GameInteraction.game_name)\
                      .order_by(desc('clicks'))\
                      .limit(5).all()
