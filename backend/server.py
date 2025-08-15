@@ -479,8 +479,9 @@ async def get_chat_rooms(db: Session = Depends(get_db), current_user: User = Dep
     if not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Only admins can view chat rooms")
     
+    # Excluir salas eliminadas
     rooms = db.query(ChatRoom).filter(
-        ChatRoom.is_active == True
+        ChatRoom.status != "deleted"
     ).order_by(desc(ChatRoom.last_message_at)).all()
     
     # Obtener el último mensaje de cada sala
@@ -502,7 +503,8 @@ async def get_chat_rooms(db: Session = Depends(get_db), current_user: User = Dep
             "last_message": last_message.message if last_message else "Sin mensajes",
             "last_message_time": last_message.created_at.isoformat() if last_message else room.created_at.isoformat(),
             "unread_count": unread_count,
-            "is_active": room.is_active
+            "is_active": room.is_active,
+            "status": room.status
         })
     
     return {
