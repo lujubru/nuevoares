@@ -13,6 +13,7 @@ const ChatWidget = ({ user }) => {
   const [roomId, setRoomId] = useState(null);
   const [socket, setSocket] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
   const messagesEndRef = useRef(null);
 
   const backendUrl = (process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001').replace(/\/$/, '');
