@@ -13,7 +13,6 @@ const ChatWidget = ({ user }) => {
   const [roomId, setRoomId] = useState(null);
   const [socket, setSocket] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
   const messagesEndRef = useRef(null);
 
   const backendUrl = (process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001').replace(/\/$/, '');
@@ -135,58 +134,6 @@ const ChatWidget = ({ user }) => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const updateChatStatus = async (roomId, status) => {
-    try {
-      const token = localStorage.getItem('token');
-      await axios.put(
-        `${backendUrl}/api/chat/rooms/${roomId}/status`,
-        { status },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      // Recargar salas después de actualizar
-      loadChatRooms();
-    } catch (error) {
-      console.error('Error actualizando estado del chat:', error);
-      alert('Error al actualizar el estado del chat');
-    }
-  };
-
-  const deleteChatRoom = async (roomId) => {
-    try {
-      const token = localStorage.getItem('token');
-      await axios.delete(
-        `${backendUrl}/api/chat/rooms/${roomId}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      // Recargar salas después de eliminar
-      loadChatRooms();
-      // Si era la sala activa, volver al listado
-      if (activeRoom === roomId) {
-        setActiveRoom(null);
-      }
-      setShowDeleteConfirm(null);
-    } catch (error) {
-      console.error('Error eliminando chat:', error);
-      alert('Error al eliminar el chat');
-    }
-  };
-
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'active': return '💬';
-      case 'closed': return '🔒';
-      default: return '💬';
-    }
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'active': return '#4CAF50';
-      case 'closed': return '#FF9800';
-      default: return '#4CAF50';
-    }
-  };
-
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!newMessage.trim()) return;
@@ -288,41 +235,10 @@ const ChatWidget = ({ user }) => {
                     chatRooms.map((room) => (
                       <div key={room.room_id} className="room-item" onClick={() => selectRoom(room)}>
                         <div className="room-header">
-                          <div className="room-info">
-                            <span className="room-username" style={{ color: getStatusColor(room.status) }}>
-                              {getStatusIcon(room.status)} {room.username}
-                            </span>
-                            {room.status === 'closed' && <span className="status-badge closed">CERRADO</span>}
-                            {room.unread_count > 0 && room.status !== 'closed' && (
-                              <span className="unread-badge">{room.unread_count}</span>
-                            )}
-                          </div>
-                          <div className="room-actions" onClick={(e) => e.stopPropagation()}>
-                            {room.status === 'active' ? (
-                              <button 
-                                className="action-button close-button"
-                                onClick={() => updateChatStatus(room.room_id, 'closed')}
-                                title="Cerrar chat"
-                              >
-                                🔒
-                              </button>
-                            ) : (
-                              <button 
-                                className="action-button reopen-button"
-                                onClick={() => updateChatStatus(room.room_id, 'active')}
-                                title="Reabrir chat"
-                              >
-                                🔓
-                              </button>
-                            )}
-                            <button 
-                              className="action-button delete-button"
-                              onClick={() => setShowDeleteConfirm(room.room_id)}
-                              title="Eliminar chat"
-                            >
-                              🗑️
-                            </button>
-                          </div>
+                          <span className="room-username">👤 {room.username}</span>
+                          {room.unread_count > 0 && (
+                            <span className="unread-badge">{room.unread_count}</span>
+                          )}
                         </div>
                         <div className="room-last-message">{room.last_message}</div>
                         <div className="room-time">
@@ -393,17 +309,6 @@ const ChatWidget = ({ user }) => {
                 <div className="welcome-message">
                   <p>¡Bienvenido al chat de soporte de Ares Club!</p>
                   <p>Nuestro equipo está aquí para ayudarte.</p>
-                  {/* Mostrar mensaje si el chat está cerrado */}
-                  {activeRoom && chatRooms.find(r => r.room_id === activeRoom)?.status === 'closed' && (
-                    <div className="chat-closed-message">
-                      <p style={{color: '#FF9800', fontWeight: 'bold'}}>
-                        🔒 Este chat ha sido cerrado por un administrador
-                      </p>
-                      <p style={{fontSize: '0.8rem', color: '#888'}}>
-                        Puedes seguir escribiendo y se reabrirá automáticamente
-                      </p>
-                    </div>
-                  )}
                   <p style={{fontSize: '0.8rem', color: '#888', marginTop: '1rem'}}>
                     Conexión: {isConnected ? '🟢 Conectado' : '🔴 Desconectado'}
                   </p>
@@ -456,36 +361,6 @@ const ChatWidget = ({ user }) => {
               </div>
             </form>
           )}
-        </div>
-      )}
-
-      {/* Modal de confirmación para eliminar */}
-      {showDeleteConfirm && (
-        <div className="delete-confirm-modal">
-          <div className="delete-confirm-content">
-            <h3>¿Eliminar chat?</h3>
-            <p>
-              ¿Estás seguro de que quieres eliminar el chat con{' '}
-              <strong>{chatRooms.find(r => r.room_id === showDeleteConfirm)?.username}</strong>?
-            </p>
-            <p style={{fontSize: '0.8rem', color: '#888'}}>
-              Esta acción no se puede deshacer. El chat y todos sus mensajes serán eliminados permanentemente.
-            </p>
-            <div className="delete-confirm-buttons">
-              <button 
-                className="confirm-delete-btn"
-                onClick={() => deleteChatRoom(showDeleteConfirm)}
-              >
-                Sí, Eliminar
-              </button>
-              <button 
-                className="cancel-delete-btn"
-                onClick={() => setShowDeleteConfirm(null)}
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
         </div>
       )}
     </>

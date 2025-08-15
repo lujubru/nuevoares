@@ -479,9 +479,8 @@ async def get_chat_rooms(db: Session = Depends(get_db), current_user: User = Dep
     if not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Only admins can view chat rooms")
     
-    # Excluir salas eliminadas
     rooms = db.query(ChatRoom).filter(
-        ChatRoom.status != "deleted"
+        ChatRoom.is_active == True
     ).order_by(desc(ChatRoom.last_message_at)).all()
     
     # Obtener el último mensaje de cada sala
@@ -503,8 +502,7 @@ async def get_chat_rooms(db: Session = Depends(get_db), current_user: User = Dep
             "last_message": last_message.message if last_message else "Sin mensajes",
             "last_message_time": last_message.created_at.isoformat() if last_message else room.created_at.isoformat(),
             "unread_count": unread_count,
-            "is_active": room.is_active,
-            "status": room.status
+            "is_active": room.is_active
         })
     
     return {
@@ -560,66 +558,6 @@ async def send_chat_message(
     
     return {"success": True, "message": "Message sent"}
 
-@app.put("/api/chat/rooms/{room_id}/status")
-async def update_chat_room_status(
-    room_id: str,
-    status_data: dict,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """Cambiar el estado de una sala de chat (solo admins)"""
-    if not current_user.is_admin:
-        raise HTTPException(status_code=403, detail="Only admins can update chat status")
-    
-    new_status = status_data.get("status")
-    if new_status not in ["active", "closed"]:
-        raise HTTPException(status_code=400, detail="Invalid status. Must be 'active' or 'closed'")
-    
-    room = db.query(ChatRoom).filter(ChatRoom.room_id == room_id).first()
-    if not room:
-        raise HTTPException(status_code=404, detail="Chat room not found")
-    
-    if room.status == "deleted":
-        raise HTTPException(status_code=400, detail="Cannot update deleted chat room")
-    
-    room.status = new_status
-    db.commit()
-    
-    return {
-        "success": True,
-        "message": f"Chat room status updated to {new_status}",
-        "room_id": room_id,
-        "status": new_status
-    }
-
-@app.delete("/api/chat/rooms/{room_id}")
-async def delete_chat_room(
-    room_id: str,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """Eliminar una sala de chat (soft delete - solo admins)"""
-    if not current_user.is_admin:
-        raise HTTPException(status_code=403, detail="Only admins can delete chat rooms")
-    
-    room = db.query(ChatRoom).filter(ChatRoom.room_id == room_id).first()
-    if not room:
-        raise HTTPException(status_code=404, detail="Chat room not found")
-    
-    if room.status == "deleted":
-        raise HTTPException(status_code=400, detail="Chat room already deleted")
-    
-    # Soft delete - marcar como eliminado
-    room.status = "deleted"
-    room.is_active = False
-    db.commit()
-    
-    return {
-        "success": True,
-        "message": "Chat room deleted successfully",
-        "room_id": room_id
-    }
-
 def generate_room_id(username):
     """Generar un ID único para la sala de chat basado en el username"""
     return hashlib.md5(f"chat_{username}".encode()).hexdigest()[:16]
@@ -652,18 +590,13 @@ async def join_room(sid, data):
             room = ChatRoom(
                 room_id=room_id,
                 username=username,
-                is_active=True,
-                status="active"
+                is_active=True
             )
             db.add(room)
         else:
-            # Actualizar última actividad si no está eliminada
-            if room.status != "deleted":
-                room.last_message_at = datetime.utcnow()
-                if room.status == "closed":
-                    # Reactivar automáticamente si el usuario escribe
-                    room.status = "active"
-                room.is_active = True
+            # Actualizar última actividad
+            room.last_message_at = datetime.utcnow()
+            room.is_active = True
         
         db.commit()
         print(f"Sala de chat creada/actualizada para {username}")
@@ -727,18 +660,13 @@ async def user_message(sid, data):
             room = ChatRoom(
                 room_id=room_id,
                 username=username,
-                is_active=True,
-                status="active"
+                is_active=True
             )
             db.add(room)
         else:
-            # Actualizar sala existente si no está eliminada
-            if room.status != "deleted":
-                room.last_message_at = datetime.utcnow()
-                if room.status == "closed":
-                    # Reactivar automáticamente si el usuario escribe
-                    room.status = "active"
-                room.is_active = True
+            # Actualizar sala existente
+            room.last_message_at = datetime.utcnow()
+            room.is_active = True
         
         db.commit()
         print(f"Mensaje guardado en BD: {chat_message.id}")
