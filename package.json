@@ -1,0 +1,19 @@
+{
+  "name": "ares-club-casino",
+  "version": "1.0.0",
+  "description": "Casino landing page with FastAPI backend and React frontend",
+  "main": "index.js",
+  "scripts": {
+    "dev": "concurrently \"cd backend && python server.py\" \"cd frontend && yarn start\"",
+    "build": "cd frontend && yarn build",
+    "start:backend": "cd backend && python server.py",
+    "start:frontend": "cd frontend && yarn start",
+    "install:all": "cd backend && pip install -r requirements.txt && cd ../frontend && yarn install"
+  },
+  "keywords": ["casino", "fastapi", "react", "postgresql", "railway", "vercel"],
+  "author": "Ares Club",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.0"
+  }
+}
