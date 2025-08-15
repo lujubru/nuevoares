@@ -378,6 +378,16 @@ function App() {
           <p>Sitio web oficial para Argentina. Juega responsablemente. +18</p>
         </div>
       </footer>
+
+      {/* Chat Widget */}
+      <ChatWidget user={user} />
+
+      {/* Login Modal */}
+      <LoginModal 
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        onLogin={handleLogin}
+      />
     </div>
   );
 }
