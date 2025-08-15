@@ -317,7 +317,7 @@ function App() {
           <div className="contact-box">
             <p>Contactanos por correo o WhatsApp:</p>
             <p><strong>Correo:</strong> aresclub.net@gmail.com</p>
-            <p><strong>WhatsApp:</strong> <a href="https://wa.me/5491178419956" target="_blank" rel="noopener noreferrer">+54 9 11 7841 9956</a></p>
+            <p><strong>WhatsApp:</strong> <a href="https://wa.me/5491178419956" target=\"_blank" rel="noopener noreferrer">+54 9 11 7841 9956</a></p>
           </div>
           
           <p>&copy; Ares Club™. Todos los derechos reservados.</p>

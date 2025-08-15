@@ -403,21 +403,34 @@
   margin: 3rem 0;
 }
 
-.payment-method {
+.payment-method-card {
   background: linear-gradient(135deg, #1a1a1a, #333333);
-  padding: 1.2rem 2.5rem;
+  padding: 1.5rem;
   border-radius: 15px;
   border: 2px solid #cc0000;
   color: #ffffff;
   font-weight: bold;
   transition: all 0.3s ease;
   cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  min-width: 150px;
 }
 
-.payment-method:hover {
+.payment-method-card:hover {
   background: linear-gradient(135deg, #cc0000, #ff0000);
   transform: scale(1.05) translateY(-3px);
   box-shadow: 0 8px 20px rgba(204, 0, 0, 0.4);
+}
+
+.payment-image {
+  width: 60px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 /* Text Content */
@@ -560,6 +573,10 @@
   .payment-methods {
     flex-direction: column;
     align-items: center;
+  }
+  
+  .payment-method-card {
+    min-width: 200px;
   }
 }
 

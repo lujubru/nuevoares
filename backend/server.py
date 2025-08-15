@@ -2,19 +2,42 @@ from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, text, func
 import os
 from dotenv import load_dotenv
 from datetime import datetime
 from typing import Optional
+import jwt
+from datetime import timedelta
+import socketio
 
-from database import get_db, create_tables, check_db_connection, Contact, GameInteraction, PromoInteraction
+from database import get_db, create_tables, check_db_connection, Contact, GameInteraction, PromoInteraction, User, ChatMessage, authenticate_user
 
 # Cargar variables de entorno
 load_dotenv()
 
 app = FastAPI(title="Ares Club Casino API", version="1.0.0")
+
+# Configuración JWT
+SECRET_KEY = os.getenv("SECRET_KEY", "ares-club-secret-key-2024")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+# Configuración Socket.IO
+sio = socketio.AsyncServer(
+    async_mode='asgi',
+    cors_allowed_origins="*",
+    logger=True,
+    engineio_logger=True
+)
+
+# Crear la aplicación ASGI con Socket.IO
+socket_app = socketio.ASGIApp(sio, app)
+
+# Security
+security = HTTPBearer()
 
 # Configuración CORS
 app.add_middleware(
@@ -24,6 +47,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Montar archivos estáticos
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Crear tablas al iniciar
 @app.on_event("startup")
@@ -42,7 +68,7 @@ GAMES = [
         "id": 1,
         "name": "Volcano Rising",
         "provider": "RubyPlay",
-        "image": "/static/images/volcano.jpg",
+        "image": "https://images.pexels.com/photos/2258536/pexels-photo-2258536.jpeg?auto=compress&cs=tinysrgb&w=400",
         "category": "slots",
         "description": "Una aventura volcánica llena de premios ardientes"
     },
@@ -50,7 +76,7 @@ GAMES = [
         "id": 2,
         "name": "Sweet Bonanza 1000",
         "provider": "Pragmatic Play",
-        "image": "/static/images/bonanza.jpg",
+        "image": "https://images.pexels.com/photos/1191710/pexels-photo-1191710.jpeg?auto=compress&cs=tinysrgb&w=400",
         "category": "slots",
         "description": "Dulces premios te esperan en esta deliciosa tragamonedas"
     },
@@ -58,7 +84,7 @@ GAMES = [
         "id": 3,
         "name": "Reactoonz",
         "provider": "Play n' Go",
-        "image": "/static/images/reac.jpg",
+        "image": "https://images.pexels.com/photos/163064/play-stone-network-networked-interactive-163064.jpeg?auto=compress&cs=tinysrgb&w=400",
         "category": "slots",
         "description": "Alienígenas divertidos con grandes multiplicadores"
     },
@@ -66,7 +92,7 @@ GAMES = [
         "id": 4,
         "name": "Book of Dead",
         "provider": "Play n' Go",
-        "image": "/static/images/book.jpg",
+        "image": "https://images.pexels.com/photos/256541/pexels-photo-256541.jpeg?auto=compress&cs=tinysrgb&w=400",
         "category": "slots",
         "description": "Explora el antiguo Egipto en busca de tesoros"
     },
@@ -74,7 +100,7 @@ GAMES = [
         "id": 5,
         "name": "Zeus Rush Fever Deluxe",
         "provider": "RubyPlay",
-        "image": "/static/images/zeus.jpg",
+        "image": "https://images.pexels.com/photos/2258536/pexels-photo-2258536.jpeg?auto=compress&cs=tinysrgb&w=400",
         "category": "slots",
         "description": "El poder de Zeus en tus manos para grandes premios"
     },
@@ -82,7 +108,7 @@ GAMES = [
         "id": 6,
         "name": "Wolf Gold",
         "provider": "Pragmatic Play",
-        "image": "/static/images/wolf.jpg",
+        "image": "https://images.pexels.com/photos/1118873/pexels-photo-1118873.jpeg?auto=compress&cs=tinysrgb&w=400",
         "category": "slots",
         "description": "Caza junto a los lobos por el oro más preciado"
     }
@@ -109,11 +135,38 @@ PROMOTIONS = [
 
 # Métodos de pago
 PAYMENT_METHODS = [
-    {"name": "Visa", "type": "card", "icon": "💳"},
-    {"name": "Mastercard", "type": "card", "icon": "💳"},
-    {"name": "Transferencia Bancaria", "type": "bank", "icon": "🏦"},
-    {"name": "E-Wallets", "type": "ewallet", "icon": "📱"}
+    {"name": "Visa", "type": "card", "icon": "💳", "image": "https://images.pexels.com/photos/164501/pexels-photo-164501.jpeg?auto=compress&cs=tinysrgb&w=200"},
+    {"name": "Mastercard", "type": "card", "icon": "💳", "image": "https://images.pexels.com/photos/164501/pexels-photo-164501.jpeg?auto=compress&cs=tinysrgb&w=200"},
+    {"name": "Transferencia Bancaria", "type": "bank", "icon": "🏦", "image": "https://images.pexels.com/photos/259027/pexels-photo-259027.jpeg?auto=compress&cs=tinysrgb&w=200"},
+    {"name": "E-Wallets", "type": "ewallet", "icon": "📱", "image": "https://images.pexels.com/photos/4386321/pexels-photo-4386321.jpeg?auto=compress&cs=tinysrgb&w=200"}
 ]
+
+# Funciones de autenticación
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    try:
+        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        return username
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+def get_current_user(db: Session = Depends(get_db), username: str = Depends(verify_token)):
+    user = db.query(User).filter(User.username == username).first()
+    if user is None:
+        raise HTTPException(status_code=401, detail="User not found")
+    return user
 
 @app.get("/")
 async def root():
@@ -349,6 +402,144 @@ async def get_stats(db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error obteniendo estadísticas: {str(e)}")
 
+# Endpoints de autenticación
+@app.post("/api/auth/login")
+async def login(login_data: dict, db: Session = Depends(get_db)):
+    """Login de usuario"""
+    username = login_data.get("username")
+    password = login_data.get("password")
+    
+    if not username or not password:
+        raise HTTPException(status_code=400, detail="Username and password required")
+    
+    user = authenticate_user(db, username, password)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.username}, expires_delta=access_token_expires
+    )
+    
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "is_admin": user.is_admin
+        }
+    }
+
+@app.get("/api/auth/me")
+async def get_current_user_info(current_user: User = Depends(get_current_user)):
+    """Obtener información del usuario actual"""
+    return {
+        "id": current_user.id,
+        "username": current_user.username,
+        "email": current_user.email,
+        "is_admin": current_user.is_admin
+    }
+
+# Endpoints de chat
+@app.get("/api/chat/messages")
+async def get_chat_messages(db: Session = Depends(get_db)):
+    """Obtener mensajes del chat"""
+    messages = db.query(ChatMessage).order_by(desc(ChatMessage.created_at)).limit(50).all()
+    return {
+        "success": True,
+        "data": [
+            {
+                "id": msg.id,
+                "username": msg.username,
+                "message": msg.message,
+                "is_admin": msg.is_admin,
+                "created_at": msg.created_at.isoformat()
+            }
+            for msg in reversed(messages)
+        ]
+    }
+
+@app.post("/api/chat/send")
+async def send_chat_message(
+    message_data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Enviar mensaje al chat (solo admins)"""
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Only admins can send messages")
+    
+    message_text = message_data.get("message")
+    if not message_text:
+        raise HTTPException(status_code=400, detail="Message is required")
+    
+    chat_message = ChatMessage(
+        user_id=current_user.id,
+        username=current_user.username,
+        message=message_text,
+        is_admin=True
+    )
+    
+    db.add(chat_message)
+    db.commit()
+    
+    # Emitir mensaje a todos los clientes conectados
+    await sio.emit('new_message', {
+        'id': chat_message.id,
+        'username': chat_message.username,
+        'message': chat_message.message,
+        'is_admin': True,
+        'created_at': chat_message.created_at.isoformat()
+    })
+    
+    return {"success": True, "message": "Message sent"}
+
+# Socket.IO events
+@sio.event
+async def connect(sid, environ):
+    print(f"Cliente conectado: {sid}")
+    await sio.emit('connected', {'message': 'Conectado al chat de Ares Club'}, room=sid)
+
+@sio.event
+async def disconnect(sid):
+    print(f"Cliente desconectado: {sid}")
+
+@sio.event
+async def user_message(sid, data):
+    """Manejar mensajes de usuarios"""
+    username = data.get('username', 'Usuario Anónimo')
+    message = data.get('message', '')
+    
+    if not message.strip():
+        return
+    
+    # Guardar mensaje en la base de datos
+    db = SessionLocal()
+    try:
+        chat_message = ChatMessage(
+            username=username,
+            message=message,
+            is_admin=False
+        )
+        db.add(chat_message)
+        db.commit()
+        
+        # Emitir mensaje a todos los clientes
+        await sio.emit('new_message', {
+            'id': chat_message.id,
+            'username': username,
+            'message': message,
+            'is_admin': False,
+            'created_at': chat_message.created_at.isoformat()
+        })
+        
+    except Exception as e:
+        print(f"Error guardando mensaje: {e}")
+    finally:
+        db.close()
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    uvicorn.run(socket_app, host="0.0.0.0", port=8001)
