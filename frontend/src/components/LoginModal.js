@@ -23,11 +23,14 @@ const LoginModal = ({ isOpen, onClose, onLogin }) => {
       if (response.data.access_token) {
         localStorage.setItem('token', response.data.access_token);
         localStorage.setItem('user', JSON.stringify(response.data.user));
+        console.log('Login exitoso - Token guardado:', response.data.access_token);
+        console.log('Usuario guardado:', response.data.user);
         onLogin(response.data.user);
         onClose();
         setCredentials({ username: '', password: '' });
       }
     } catch (error) {
+      console.error('Error en login:', error);
       setError(error.response?.data?.detail || 'Error al iniciar sesión');
     } finally {
       setLoading(false);

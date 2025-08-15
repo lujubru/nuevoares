@@ -101,12 +101,15 @@ function App() {
 
   const handleLogin = (userData) => {
     setUser(userData);
+    console.log('Usuario logueado:', userData);
+    console.log('Token guardado:', localStorage.getItem('token'));
   };
 
   const handleLogout = () => {
     localStorage.removeItem('user');
     localStorage.removeItem('token');
     setUser(null);
+    console.log('Usuario deslogueado');
   };
 
   if (loading) {

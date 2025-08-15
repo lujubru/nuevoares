@@ -156,12 +156,18 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     try:
+        if not credentials or not credentials.credentials:
+            raise HTTPException(status_code=401, detail="No token provided")
         payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
         if username is None:
             raise HTTPException(status_code=401, detail="Invalid token")
+        print(f"Token verificado para usuario: {username}")
         return username
-    except jwt.PyJWTError:
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.PyJWTError as e:
+        print(f"Error verificando token: {e}")
         raise HTTPException(status_code=401, detail="Invalid token")
 
 def get_current_user(db: Session = Depends(get_db), username: str = Depends(verify_token)):
