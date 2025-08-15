@@ -260,16 +260,30 @@ const ChatWidget = ({ user }) => {
                     </div>
                   ) : (
                     chatRooms.map((room) => (
-                      <div key={room.room_id} className="room-item" onClick={() => selectRoom(room)}>
-                        <div className="room-header">
-                          <span className="room-username">👤 {room.username}</span>
-                          {room.unread_count > 0 && (
-                            <span className="unread-badge">{room.unread_count}</span>
-                          )}
+                      <div key={room.room_id} className="room-item">
+                        <div className="room-content" onClick={() => selectRoom(room)}>
+                          <div className="room-header">
+                            <span className="room-username">👤 {room.username}</span>
+                            {room.unread_count > 0 && (
+                              <span className="unread-badge">{room.unread_count}</span>
+                            )}
+                          </div>
+                          <div className="room-last-message">{room.last_message}</div>
+                          <div className="room-time">
+                            {new Date(room.last_message_time).toLocaleString()}
+                          </div>
                         </div>
-                        <div className="room-last-message">{room.last_message}</div>
-                        <div className="room-time">
-                          {new Date(room.last_message_time).toLocaleString()}
+                        <div className="room-actions">
+                          <button 
+                            className="delete-room-button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteRoom(room.room_id, room.username);
+                            }}
+                            title="Eliminar conversación"
+                          >
+                            🗑️
+                          </button>
                         </div>
                       </div>
                     ))
