@@ -180,6 +180,33 @@ const ChatWidget = ({ user }) => {
     }
   };
 
+  const deleteRoom = async (roomId, roomUsername) => {
+    if (!window.confirm(`¿Estás seguro de que quieres eliminar la conversación con ${roomUsername}?\n\nEsta acción no se puede deshacer y eliminará todos los mensajes.`)) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.delete(`${backendUrl}/api/chat/rooms/${roomId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (response.data.success) {
+        // Si estamos viendo la conversación que se eliminó, volver a la lista
+        if (activeRoom === roomId) {
+          setActiveRoom(null);
+          setMessages([]);
+        }
+        // Recargar la lista de conversaciones
+        await loadChatRooms();
+        console.log(`Conversación eliminada: ${roomUsername}`);
+      }
+    } catch (error) {
+      console.error('Error eliminando conversación:', error);
+      alert('Error al eliminar la conversación. Por favor intenta nuevamente.');
+    }
+  };
+
   const toggleChat = () => {
     setIsOpen(!isOpen);
     if (!isOpen && user && user.is_admin) {
