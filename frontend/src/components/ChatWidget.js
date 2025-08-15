@@ -458,6 +458,36 @@ const ChatWidget = ({ user }) => {
           )}
         </div>
       )}
+
+      {/* Modal de confirmación para eliminar */}
+      {showDeleteConfirm && (
+        <div className="delete-confirm-modal">
+          <div className="delete-confirm-content">
+            <h3>¿Eliminar chat?</h3>
+            <p>
+              ¿Estás seguro de que quieres eliminar el chat con{' '}
+              <strong>{chatRooms.find(r => r.room_id === showDeleteConfirm)?.username}</strong>?
+            </p>
+            <p style={{fontSize: '0.8rem', color: '#888'}}>
+              Esta acción no se puede deshacer. El chat y todos sus mensajes serán eliminados permanentemente.
+            </p>
+            <div className="delete-confirm-buttons">
+              <button 
+                className="confirm-delete-btn"
+                onClick={() => deleteChatRoom(showDeleteConfirm)}
+              >
+                Sí, Eliminar
+              </button>
+              <button 
+                className="cancel-delete-btn"
+                onClick={() => setShowDeleteConfirm(null)}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };
