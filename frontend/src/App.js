@@ -62,6 +62,19 @@ function App() {
     fetchData();
   }, [backendUrl]);
 
+  // Verificar si hay usuario logueado al cargar
+  useEffect(() => {
+    const savedUser = localStorage.getItem('user');
+    if (savedUser) {
+      try {
+        setUser(JSON.parse(savedUser));
+      } catch (error) {
+        localStorage.removeItem('user');
+        localStorage.removeItem('token');
+      }
+    }
+  }, []);
+
   // Carousel automático
   useEffect(() => {
     const interval = setInterval(() => {
