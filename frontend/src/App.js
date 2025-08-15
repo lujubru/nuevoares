@@ -99,6 +99,16 @@ function App() {
     handleWhatsAppClick('Lead');
   };
 
+  const handleLogin = (userData) => {
+    setUser(userData);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
+    setUser(null);
+  };
+
   if (loading) {
     return (
       <div className="loading-screen">
