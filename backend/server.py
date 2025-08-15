@@ -70,7 +70,7 @@ GAMES = [
         "id": 1,
         "name": "Volcano Rising",
         "provider": "RubyPlay",
-        "image": "https://images.pexels.com/photos/2258536/pexels-photo-2258536.jpeg?auto=compress&cs=tinysrgb&w=400",
+        "image": "/static/images/volcano.jpg",
         "category": "slots",
         "description": "Una aventura volcánica llena de premios ardientes"
     },
@@ -78,7 +78,7 @@ GAMES = [
         "id": 2,
         "name": "Sweet Bonanza 1000",
         "provider": "Pragmatic Play",
-        "image": "https://images.pexels.com/photos/1191710/pexels-photo-1191710.jpeg?auto=compress&cs=tinysrgb&w=400",
+        "image": "/static/images/bonanza.jpg",
         "category": "slots",
         "description": "Dulces premios te esperan en esta deliciosa tragamonedas"
     },
@@ -86,7 +86,7 @@ GAMES = [
         "id": 3,
         "name": "Reactoonz",
         "provider": "Play n' Go",
-        "image": "https://images.pexels.com/photos/163064/play-stone-network-networked-interactive-163064.jpeg?auto=compress&cs=tinysrgb&w=400",
+        "image": "/static/images/reac.jpg",
         "category": "slots",
         "description": "Alienígenas divertidos con grandes multiplicadores"
     },
@@ -94,7 +94,7 @@ GAMES = [
         "id": 4,
         "name": "Book of Dead",
         "provider": "Play n' Go",
-        "image": "https://images.pexels.com/photos/256541/pexels-photo-256541.jpeg?auto=compress&cs=tinysrgb&w=400",
+        "image": "/static/images/book.jpg",
         "category": "slots",
         "description": "Explora el antiguo Egipto en busca de tesoros"
     },
@@ -102,7 +102,7 @@ GAMES = [
         "id": 5,
         "name": "Zeus Rush Fever Deluxe",
         "provider": "RubyPlay",
-        "image": "https://images.pexels.com/photos/2258536/pexels-photo-2258536.jpeg?auto=compress&cs=tinysrgb&w=400",
+        "image": "/static/images/zeus.jpg",
         "category": "slots",
         "description": "El poder de Zeus en tus manos para grandes premios"
     },
@@ -110,7 +110,7 @@ GAMES = [
         "id": 6,
         "name": "Wolf Gold",
         "provider": "Pragmatic Play",
-        "image": "https://images.pexels.com/photos/1118873/pexels-photo-1118873.jpeg?auto=compress&cs=tinysrgb&w=400",
+        "image": "/static/images/wolf.jpg",
         "category": "slots",
         "description": "Caza junto a los lobos por el oro más preciado"
     }
