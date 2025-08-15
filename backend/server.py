@@ -128,7 +128,7 @@ async def root():
 async def health_check(db: Session = Depends(get_db)):
     """Verificar estado de la API y base de datos"""
     try:
-        db.execute("SELECT 1")
+        db.execute(text("SELECT 1"))
         return {
             "status": "healthy",
             "database": "connected",
