@@ -727,13 +727,18 @@ async def user_message(sid, data):
             room = ChatRoom(
                 room_id=room_id,
                 username=username,
-                is_active=True
+                is_active=True,
+                status="active"
             )
             db.add(room)
         else:
-            # Actualizar sala existente
-            room.last_message_at = datetime.utcnow()
-            room.is_active = True
+            # Actualizar sala existente si no está eliminada
+            if room.status != "deleted":
+                room.last_message_at = datetime.utcnow()
+                if room.status == "closed":
+                    # Reactivar automáticamente si el usuario escribe
+                    room.status = "active"
+                room.is_active = True
         
         db.commit()
         print(f"Mensaje guardado en BD: {chat_message.id}")
