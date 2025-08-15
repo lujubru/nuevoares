@@ -28,7 +28,7 @@ function App() {
   
   const { trackEvent } = useMetaPixel();
   
-  const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+  const backendUrl = (process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001').replace(/\/$/, '');
   
   // Imágenes del carousel
   const carouselImages = [
