@@ -558,6 +558,41 @@ async def send_chat_message(
     
     return {"success": True, "message": "Message sent"}
 
+@app.delete("/api/chat/rooms/{room_id}")
+async def delete_chat_room(
+    room_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Eliminar una conversación completa (solo admins)"""
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Only admins can delete chat rooms")
+    
+    # Verificar que la sala existe
+    room = db.query(ChatRoom).filter(ChatRoom.room_id == room_id).first()
+    if not room:
+        raise HTTPException(status_code=404, detail="Chat room not found")
+    
+    try:
+        # Eliminar todos los mensajes de la sala primero
+        messages_deleted = db.query(ChatMessage).filter(ChatMessage.room_id == room_id).delete()
+        
+        # Eliminar la sala
+        db.query(ChatRoom).filter(ChatRoom.room_id == room_id).delete()
+        
+        # Confirmar cambios
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": "Chat room deleted successfully",
+            "messages_deleted": messages_deleted,
+            "room_id": room_id
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error deleting chat room: {str(e)}")
+
 def generate_room_id(username):
     """Generar un ID único para la sala de chat basado en el username"""
     return hashlib.md5(f"chat_{username}".encode()).hexdigest()[:16]
