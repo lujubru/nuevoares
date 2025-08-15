@@ -13,7 +13,7 @@ import jwt
 from datetime import timedelta
 import socketio
 
-from database import get_db, create_tables, check_db_connection, Contact, GameInteraction, PromoInteraction, User, ChatMessage, authenticate_user, SessionLocal
+from database import get_db, create_tables, check_db_connection, Contact, GameInteraction, PromoInteraction, User, ChatMessage, authenticate_user, SessionLocal, SessionLocal
 
 # Cargar variables de entorno
 load_dotenv()
