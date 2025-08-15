@@ -49,7 +49,9 @@ app.add_middleware(
 )
 
 # Montar archivos estáticos
-app.mount("/static", StaticFiles(directory="static"), name="static")
+if os.path.isdir("static"):
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+
 
 # Crear tablas al iniciar
 @app.on_event("startup")
